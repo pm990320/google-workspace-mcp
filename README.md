@@ -305,6 +305,26 @@ Uploads a local image file to Google Drive and inserts it into the document. Thi
 
 ---
 
+## Testing
+
+The multi-tab support features have been thoroughly tested and verified:
+
+✅ **Tested Features:**
+- `listDocumentTabs` - Lists all tabs with IDs, titles, positions, and content summaries
+- `readGoogleDoc` with `tabId` - Reads specific tabs; backward compatible without `tabId`
+- `appendToGoogleDoc` with `tabId` - Appends to specific tabs without affecting others
+- `insertText` with `tabId` - Inserts text at specific positions in specific tabs
+- `deleteRange` with `tabId` - Deletes content from specific tabs in isolation
+- Multi-tab operations - Sequential operations on different tabs work independently
+- Error handling - Invalid tab IDs return clear, helpful error messages
+- Backward compatibility - Operations without `tabId` default to first tab (legacy documents supported)
+
+All tab-related features have been validated with real Google Docs containing multiple tabs, confirming:
+- Tab isolation (operations on one tab don't affect others)
+- Proper tab ID validation and error messages
+- Correct content retrieval and manipulation per tab
+- Full backward compatibility with single-tab and legacy documents
+
 ## Troubleshooting
 
 - **Claude shows "Failed" or "Could not attach":**
@@ -317,6 +337,10 @@ Uploads a local image file to Google Drive and inserts it into the document. Thi
   - Ensure you enabled the correct APIs (Docs, Drive).
   - Make sure you added your email as a Test User on the OAuth Consent Screen.
   - Verify the `credentials.json` file is correctly placed in the project root.
+- **Tab-related Errors:**
+  - If you get "Tab with ID not found", use `listDocumentTabs` to see all available tab IDs
+  - Ensure you're using the correct tab ID format (typically a short alphanumeric string)
+  - Single-tab documents don't require `tabId` - operations work on the document body automatically
 
 ---
 
