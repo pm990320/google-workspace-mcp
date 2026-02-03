@@ -29,7 +29,10 @@ const SCOPES = [
 // SERVICE_ACCOUNT_PATH environment variable is set.
 // Supports domain-wide delegation via GOOGLE_IMPERSONATE_USER env var.
 async function authorizeWithServiceAccount(): Promise<JWT> {
-  const serviceAccountPath = process.env.SERVICE_ACCOUNT_PATH!; // We know this is set if we are in this function
+  const serviceAccountPath = process.env.SERVICE_ACCOUNT_PATH;
+  if (!serviceAccountPath) {
+    throw new Error('SERVICE_ACCOUNT_PATH environment variable is required');
+  }
   const impersonateUser = process.env.GOOGLE_IMPERSONATE_USER; // Optional: email of user to impersonate
   try {
     const keyFileContent = await fs.readFile(serviceAccountPath, 'utf8');

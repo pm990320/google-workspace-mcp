@@ -18,23 +18,15 @@ import { isGoogleApiError, getErrorMessage } from './errorHelpers.js';
 const MAX_BATCH_UPDATE_REQUESTS = 50; // Google API limits batch size
 
 // --- Core Helper to Execute Batch Updates ---
-export async function executeBatchUpdate(
+
+/**
+ * Execute a single batch update with error handling
+ */
+async function executeSingleBatch(
   docs: DocsClient,
   documentId: string,
   requests: docs_v1.Schema$Request[]
 ): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
-  if (requests.length === 0) {
-    // console.warn("executeBatchUpdate called with no requests.");
-    return {}; // Nothing to do
-  }
-
-  // TODO: Consider splitting large request arrays into multiple batches if needed
-  if (requests.length > MAX_BATCH_UPDATE_REQUESTS) {
-    console.warn(
-      `Attempting batch update with ${requests.length} requests, exceeding typical limits. May fail.`
-    );
-  }
-
   try {
     const response = await docs.documents.batchUpdate({
       documentId: documentId,
@@ -73,6 +65,56 @@ export async function executeBatchUpdate(
     // Generic internal error for others
     throw new Error(`Google API Error (${code}): ${message}`);
   }
+}
+
+/**
+ * Execute batch updates, automatically splitting large request arrays into multiple batches.
+ * Returns the combined response from all batches.
+ */
+export async function executeBatchUpdate(
+  docs: DocsClient,
+  documentId: string,
+  requests: docs_v1.Schema$Request[]
+): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
+  if (requests.length === 0) {
+    return {}; // Nothing to do
+  }
+
+  // If within limits, execute as single batch
+  if (requests.length <= MAX_BATCH_UPDATE_REQUESTS) {
+    return executeSingleBatch(docs, documentId, requests);
+  }
+
+  // Split into multiple batches and execute sequentially
+  // Note: Sequential execution is required because document indices change after each batch
+  console.warn(
+    `Splitting ${requests.length} requests into ${Math.ceil(requests.length / MAX_BATCH_UPDATE_REQUESTS)} batches of up to ${MAX_BATCH_UPDATE_REQUESTS} each.`
+  );
+
+  const allReplies: docs_v1.Schema$Response[] = [];
+  let lastDocumentId = documentId;
+
+  for (let i = 0; i < requests.length; i += MAX_BATCH_UPDATE_REQUESTS) {
+    const batch = requests.slice(i, i + MAX_BATCH_UPDATE_REQUESTS);
+    const batchNum = Math.floor(i / MAX_BATCH_UPDATE_REQUESTS) + 1;
+    const totalBatches = Math.ceil(requests.length / MAX_BATCH_UPDATE_REQUESTS);
+
+    console.warn(`Executing batch ${batchNum}/${totalBatches} (${batch.length} requests)...`);
+
+    const response = await executeSingleBatch(docs, documentId, batch);
+
+    if (response.replies) {
+      allReplies.push(...response.replies);
+    }
+    if (response.documentId) {
+      lastDocumentId = response.documentId;
+    }
+  }
+
+  return {
+    documentId: lastDocumentId,
+    replies: allReplies.length > 0 ? allReplies : undefined,
+  };
 }
 
 // --- Text Finding Helper ---
@@ -384,7 +426,11 @@ export function buildUpdateTextStyleRequest(
     textStyle.link = { url: style.linkUrl };
     fieldsToUpdate.push('link');
   }
-  // TODO: Handle clearing formatting
+  if (style.removeLink === true) {
+    // To remove a link, we set link to an empty object and update the 'link' field
+    textStyle.link = {};
+    fieldsToUpdate.push('link');
+  }
 
   if (fieldsToUpdate.length === 0) return null; // No styles to apply
 
@@ -526,36 +572,195 @@ export interface StyleCriteria {
   fontSize?: number;
 }
 
-export function findParagraphsMatchingStyle(
-  _docs: DocsClient,
-  _documentId: string,
-  _styleCriteria: StyleCriteria
+export async function findParagraphsMatchingStyle(
+  docs: DocsClient,
+  documentId: string,
+  styleCriteria: StyleCriteria
 ): Promise<{ startIndex: number; endIndex: number }[]> {
-  // TODO: Implement logic
-  // 1. Get document content with paragraph elements and their styles.
-  // 2. Iterate through paragraphs.
-  // 3. For each paragraph, check if its computed style matches the criteria.
-  // 4. Return ranges of matching paragraphs.
-  console.warn('findParagraphsMatchingStyle is not implemented.');
-  throw new NotImplementedError('Finding paragraphs by style criteria is not yet implemented.');
+  // Get document content
+  const response = await docs.documents.get({ documentId });
+  const document = response.data;
+  const body = document.body;
+
+  if (!body?.content) {
+    return [];
+  }
+
+  const matchingRanges: { startIndex: number; endIndex: number }[] = [];
+
+  // Helper to check if a text style matches criteria
+  function styleMatches(textStyle: docs_v1.Schema$TextStyle | undefined): boolean {
+    if (!textStyle) return false;
+
+    if (styleCriteria.bold !== undefined && textStyle.bold !== styleCriteria.bold) {
+      return false;
+    }
+    if (styleCriteria.italic !== undefined && textStyle.italic !== styleCriteria.italic) {
+      return false;
+    }
+    if (styleCriteria.fontFamily !== undefined) {
+      const fontFamily = textStyle.weightedFontFamily?.fontFamily;
+      if (fontFamily !== styleCriteria.fontFamily) {
+        return false;
+      }
+    }
+    if (styleCriteria.fontSize !== undefined) {
+      const fontSize = textStyle.fontSize?.magnitude;
+      if (fontSize !== styleCriteria.fontSize) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Iterate through structural elements to find paragraphs
+  for (const element of body.content) {
+    if (element.paragraph) {
+      const paragraph = element.paragraph;
+      const startIdx = element.startIndex ?? 0;
+      const endIdx = element.endIndex ?? startIdx;
+
+      // Check if any text run in this paragraph matches the criteria
+      let paragraphMatches = false;
+      if (paragraph.elements) {
+        for (const paraElement of paragraph.elements) {
+          if (paraElement.textRun?.textStyle) {
+            if (styleMatches(paraElement.textRun.textStyle)) {
+              paragraphMatches = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (paragraphMatches) {
+        matchingRanges.push({ startIndex: startIdx, endIndex: endIdx });
+      }
+    }
+  }
+
+  return matchingRanges;
 }
 
-export function detectAndFormatLists(
-  _docs: DocsClient,
-  _documentId: string,
-  _startIndex?: number,
-  _endIndex?: number
+/** Pattern info for list detection */
+interface ListPattern {
+  regex: RegExp;
+  bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE' | 'NUMBERED_DECIMAL_ALPHA_ROMAN';
+}
+
+const LIST_PATTERNS: ListPattern[] = [
+  // Bullet patterns: -, *, •
+  { regex: /^[\s]*[-*•]\s+/, bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE' },
+  // Numbered patterns: 1. 2. etc
+  { regex: /^[\s]*\d+[.)]\s+/, bulletPreset: 'NUMBERED_DECIMAL_ALPHA_ROMAN' },
+  // Letter patterns: a) b) A) B)
+  { regex: /^[\s]*[a-zA-Z][.)]\s+/, bulletPreset: 'NUMBERED_DECIMAL_ALPHA_ROMAN' },
+];
+
+export async function detectAndFormatLists(
+  docs: DocsClient,
+  documentId: string,
+  startIndex?: number,
+  endIndex?: number
 ): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
-  // TODO: Implement complex logic
-  // 1. Get document content (paragraphs, text runs) in the specified range (or whole doc).
-  // 2. Iterate through paragraphs.
-  // 3. Identify sequences of paragraphs starting with list-like markers (e.g., "-", "*", "1.", "a)").
-  // 4. Determine nesting levels based on indentation or marker patterns.
-  // 5. Generate CreateParagraphBulletsRequests for the identified sequences.
-  // 6. Potentially delete the original marker text.
-  // 7. Execute the batch update.
-  console.warn('detectAndFormatLists is not implemented.');
-  throw new NotImplementedError('Automatic list detection and formatting is not yet implemented.');
+  // Get document content
+  const response = await docs.documents.get({ documentId });
+  const document = response.data;
+  const body = document.body;
+
+  if (!body?.content) {
+    return {};
+  }
+
+  const requests: docs_v1.Schema$Request[] = [];
+
+  // Track paragraphs that look like list items
+  interface PotentialListItem {
+    startIndex: number;
+    endIndex: number;
+    markerEndIndex: number; // Where the marker text ends (to delete it later)
+    bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE' | 'NUMBERED_DECIMAL_ALPHA_ROMAN';
+  }
+
+  const potentialListItems: PotentialListItem[] = [];
+
+  // Iterate through structural elements to find paragraphs
+  for (const element of body.content) {
+    if (!element.paragraph) continue;
+
+    const paraStart = element.startIndex ?? 0;
+    const paraEnd = element.endIndex ?? paraStart;
+
+    // Skip if outside specified range
+    if (startIndex !== undefined && paraEnd < startIndex) continue;
+    if (endIndex !== undefined && paraStart > endIndex) continue;
+
+    // Skip paragraphs that are already in a list
+    if (element.paragraph.bullet) continue;
+
+    // Get the text content of the paragraph
+    let paragraphText = '';
+    if (element.paragraph.elements) {
+      for (const paraElement of element.paragraph.elements) {
+        if (paraElement.textRun?.content) {
+          paragraphText += paraElement.textRun.content;
+        }
+      }
+    }
+
+    // Check if the paragraph starts with a list marker
+    for (const pattern of LIST_PATTERNS) {
+      const match = pattern.regex.exec(paragraphText);
+      if (match) {
+        potentialListItems.push({
+          startIndex: paraStart,
+          endIndex: paraEnd,
+          markerEndIndex: paraStart + match[0].length,
+          bulletPreset: pattern.bulletPreset,
+        });
+        break; // Only match one pattern per paragraph
+      }
+    }
+  }
+
+  if (potentialListItems.length === 0) {
+    return {}; // No list items detected
+  }
+
+  // Group consecutive paragraphs with the same bullet type into lists
+  // For now, just apply bullets to each detected item
+  // Process in reverse order to maintain correct indices when deleting markers
+  const sortedItems = [...potentialListItems].sort((a, b) => b.startIndex - a.startIndex);
+
+  for (const item of sortedItems) {
+    // First, delete the marker text
+    requests.push({
+      deleteContentRange: {
+        range: {
+          startIndex: item.startIndex,
+          endIndex: item.markerEndIndex,
+        },
+      },
+    });
+
+    // Then create the bullet
+    // Note: After deletion, the paragraph range shifts, but createParagraphBullets
+    // works on paragraph boundaries, so we use the original start index
+    requests.push({
+      createParagraphBullets: {
+        range: {
+          startIndex: item.startIndex,
+          endIndex: item.startIndex + 1, // Just needs to touch the paragraph
+        },
+        bulletPreset: item.bulletPreset,
+      },
+    });
+  }
+
+  // Reverse to get correct execution order (Google Docs processes requests in order)
+  requests.reverse();
+
+  return executeBatchUpdate(docs, documentId, requests);
 }
 
 export function addCommentHelper(

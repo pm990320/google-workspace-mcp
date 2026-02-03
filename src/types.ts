@@ -178,7 +178,10 @@ export const TextStyleParameters = z
       .url()
       .optional()
       .describe('Make the text a hyperlink pointing to this URL.'),
-    // clearDirectFormatting: z.boolean().optional().describe('If true, attempts to clear all direct text formatting within the range before applying new styles.') // Harder to implement perfectly
+    removeLink: z
+      .boolean()
+      .optional()
+      .describe('If true, removes any hyperlink from the text. Cannot be used with linkUrl.'),
   })
   .describe('Parameters for character-level text formatting.');
 

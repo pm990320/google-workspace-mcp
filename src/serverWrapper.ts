@@ -1,4 +1,4 @@
-// src/serverWrapper.ts - Server wrapper for read-only mode enforcement
+// src/serverWrapper.ts - Server wrapper for read-only mode enforcement and error handling
 import type { Tool, ToolParameters, Context } from 'fastmcp';
 import { type FastMCP } from 'fastmcp';
 import type { FastMCPSessionAuth } from './types.js';
@@ -6,6 +6,19 @@ import type { FastMCPSessionAuth } from './types.js';
 export interface ServerConfig {
   /** When true, tools with readOnlyHint: false will be blocked at runtime */
   readOnly: boolean;
+}
+
+const HELP_MESSAGE = `
+
+For help, see: https://github.com/zueai/google-workspace-mcp#troubleshooting
+To report an issue: https://github.com/zueai/google-workspace-mcp/issues`;
+
+/**
+ * Enhances error messages with help links
+ */
+function enhanceErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `${message}${HELP_MESSAGE}`;
 }
 
 /**

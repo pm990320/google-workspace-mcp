@@ -912,11 +912,11 @@ export function registerDriveTools(
         const document = response.data;
         let result = `Successfully created document "${document.name}" (ID: ${document.id})\nView Link: ${document.webViewLink}`;
 
-        if (args.initialContent) {
+        if (args.initialContent && document.id) {
           try {
             const docs = await getDocsClient(args.account);
             await docs.documents.batchUpdate({
-              documentId: document.id!,
+              documentId: document.id,
               requestBody: {
                 requests: [
                   {
@@ -1023,9 +1023,9 @@ export function registerDriveTools(
               });
             }
 
-            if (requests.length > 0) {
+            if (requests.length > 0 && document.id) {
               await docs.documents.batchUpdate({
-                documentId: document.id!,
+                documentId: document.id,
                 requestBody: { requests },
               });
 

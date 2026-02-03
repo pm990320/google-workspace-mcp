@@ -325,6 +325,7 @@ export async function formatCells(
     }
 
     // Parse A1 range to get row/column indices
+    // eslint-disable-next-line security/detect-unsafe-regex -- Simple bounded regex for A1 notation parsing
     const rangeMatch = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i.exec(a1Range);
     if (!rangeMatch) {
       throw new UserError(`Invalid range format: ${a1Range}. Expected format like "A1" or "A1:B2"`);

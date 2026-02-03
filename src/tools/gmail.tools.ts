@@ -282,12 +282,13 @@ export function registerGmailTools(
 
       const messages = listResponse.data.messages ?? [];
 
-      // Get snippets for each message
+      // Get snippets for each message (filter ensures m.id is defined)
+      const messagesWithIds = messages.slice(0, 20).filter((m): m is typeof m & { id: string } => Boolean(m.id));
       const results = await Promise.all(
-        messages.slice(0, 20).map(async (m) => {
+        messagesWithIds.map(async (m) => {
           const msg = await gmail.users.messages.get({
             userId: 'me',
-            id: m.id!,
+            id: m.id,
             format: 'metadata',
             metadataHeaders: ['From', 'Subject', 'Date'],
           });
