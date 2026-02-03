@@ -1,8 +1,8 @@
 // drive.tools.ts - Google Drive tool module
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { drive_v3, docs_v1 } from 'googleapis';
-import { AccountDocumentParameters, FastMCPServer } from '../types.js';
+import { type drive_v3, type docs_v1 } from 'googleapis';
+import { AccountDocumentParameters, type FastMCPServer } from '../types.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 
 export function registerDriveTools(

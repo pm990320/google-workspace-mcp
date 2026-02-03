@@ -1,16 +1,16 @@
 // src/googleDocsApiHelpers.ts
-import { docs_v1 } from 'googleapis';
+import { type docs_v1 } from 'googleapis';
 import { UserError } from 'fastmcp';
 import {
-  TextStyleArgs,
-  ParagraphStyleArgs,
+  type TextStyleArgs,
+  type ParagraphStyleArgs,
   hexToRgbColor,
   NotImplementedError,
-  DocsClient,
-  StructuralElement,
-  ParagraphElement,
-  TableRow,
-  TableCell,
+  type DocsClient,
+  type StructuralElement,
+  type ParagraphElement,
+  type TableRow,
+  type TableCell,
 } from './types.js';
 import { isGoogleApiError, getErrorMessage } from './errorHelpers.js';
 
@@ -52,7 +52,7 @@ export async function executeBatchUpdate(
     // Translate common API errors to UserErrors
     if (code === 400 && message.includes('Invalid requests')) {
       // Try to extract more specific info if available
-      const details = (responseData as { error?: { details?: Array<{ description?: string }> } })
+      const details = (responseData as { error?: { details?: { description?: string }[] } })
         ?.error?.details;
       let detailMsg = '';
       if (details && Array.isArray(details)) {
@@ -79,7 +79,7 @@ export async function findTextRange(
   docs: DocsClient,
   documentId: string,
   textToFind: string,
-  instance: number = 1
+  instance = 1
 ): Promise<{ startIndex: number; endIndex: number } | null> {
   try {
     // Request more detailed information about the document structure
@@ -118,7 +118,7 @@ export async function findTextRange(
         }
 
         // Handle table elements - this is simplified and might need expansion
-        if (element.table && element.table.tableRows) {
+        if (element.table?.tableRows) {
           element.table.tableRows.forEach((row: TableRow) => {
             if (row.tableCells) {
               row.tableCells.forEach((cell: TableCell) => {
@@ -279,7 +279,7 @@ export async function getParagraphRange(
             }
 
             // If it's a table, we need to check cells recursively
-            if (element.table && element.table.tableRows) {
+            if (element.table?.tableRows) {
               console.log(`Index ${indexWithin} is within a table, searching cells...`);
               for (const row of element.table.tableRows) {
                 if (row.tableCells) {
@@ -524,7 +524,7 @@ export interface StyleCriteria {
   fontSize?: number;
 }
 
-export async function findParagraphsMatchingStyle(
+export function findParagraphsMatchingStyle(
   _docs: DocsClient,
   _documentId: string,
   _styleCriteria: StyleCriteria
@@ -536,10 +536,9 @@ export async function findParagraphsMatchingStyle(
   // 4. Return ranges of matching paragraphs.
   console.warn('findParagraphsMatchingStyle is not implemented.');
   throw new NotImplementedError('Finding paragraphs by style criteria is not yet implemented.');
-  // return [];
 }
 
-export async function detectAndFormatLists(
+export function detectAndFormatLists(
   _docs: DocsClient,
   _documentId: string,
   _startIndex?: number,
@@ -555,10 +554,9 @@ export async function detectAndFormatLists(
   // 7. Execute the batch update.
   console.warn('detectAndFormatLists is not implemented.');
   throw new NotImplementedError('Automatic list detection and formatting is not yet implemented.');
-  // return {};
 }
 
-export async function addCommentHelper(
+export function addCommentHelper(
   _docs: DocsClient,
   _documentId: string,
   _text: string,
@@ -661,7 +659,7 @@ export async function uploadImageToDrive(
 
   // Get file name and mime type
   const fileName = path.basename(localFilePath);
-  const mimeTypeMap: { [key: string]: string } = {
+  const mimeTypeMap: Record<string, string> = {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.png': 'image/png',

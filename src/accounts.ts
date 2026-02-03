@@ -3,18 +3,22 @@
 
 import {
   google,
-  docs_v1,
-  drive_v3,
-  sheets_v4,
-  gmail_v1,
-  calendar_v3,
-  slides_v1,
-  forms_v1,
+  type docs_v1,
+  type drive_v3,
+  type sheets_v4,
+  type gmail_v1,
+  type calendar_v3,
+  type slides_v1,
+  type forms_v1,
 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import { type OAuth2Client, type Credentials } from 'google-auth-library';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as http from 'http';
+import {
+  type OAuthCredentialsFile,
+  type ParsedOAuthCredentials,
+} from './types.js';
 
 // --- Configuration paths ---
 const CONFIG_DIR = path.join(process.env.HOME || '~', '.google-mcp');
@@ -105,9 +109,21 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function loadCredentials(
-  accountName?: string
-): Promise<{ client_id: string; client_secret: string; redirect_uris: string[] }> {
+/** Parse OAuth credentials from a file path */
+async function parseCredentialsFile(
+  credPath: string
+): Promise<{ client_id: string; client_secret: string }> {
+  const content = await fs.readFile(credPath, 'utf8');
+  const keys = JSON.parse(content) as OAuthCredentialsFile;
+  const key = keys.installed ?? keys.web;
+  if (!key) throw new Error(`Could not find client secrets in ${credPath}.`);
+  return {
+    client_id: key.client_id,
+    client_secret: key.client_secret,
+  };
+}
+
+async function loadCredentials(accountName?: string): Promise<ParsedOAuthCredentials> {
   const config = await loadAccountsConfig();
   let credPath: string;
 
@@ -136,13 +152,13 @@ async function loadCredentials(
 
   try {
     const content = await fs.readFile(credPath, 'utf8');
-    const keys = JSON.parse(content);
-    const key = keys.installed || keys.web;
+    const keys = JSON.parse(content) as OAuthCredentialsFile;
+    const key = keys.installed ?? keys.web;
     if (!key) throw new Error(`Could not find client secrets in ${credPath}.`);
     return {
       client_id: key.client_id,
       client_secret: key.client_secret,
-      redirect_uris: key.redirect_uris || ['http://localhost:3000'],
+      redirect_uris: key.redirect_uris ?? ['http://localhost:3000'],
     };
   } catch (err: unknown) {
     if (isNodeError(err) && err.code === 'ENOENT') {
@@ -164,7 +180,7 @@ async function loadTokenForAccount(accountName: string): Promise<OAuth2Client | 
 
   try {
     const tokenContent = await fs.readFile(account.tokenPath, 'utf8');
-    const credentials = JSON.parse(tokenContent);
+    const credentials = JSON.parse(tokenContent) as Credentials;
     // Use account-specific credentials if available
     const { client_id, client_secret, redirect_uris } = await loadCredentials(accountName);
 
@@ -350,22 +366,16 @@ export async function startAddAccount(
 
   if (credentialsPath) {
     // Load from the specified path
-    const content = await fs.readFile(credentialsPath, 'utf8');
-    const keys = JSON.parse(content);
-    const key = keys.installed || keys.web;
-    if (!key) throw new Error(`Could not find client secrets in ${credentialsPath}.`);
-    client_id = key.client_id;
-    client_secret = key.client_secret;
+    const parsed = await parseCredentialsFile(credentialsPath);
+    client_id = parsed.client_id;
+    client_secret = parsed.client_secret;
   } else {
     // Check for account-specific credentials in the credentials directory
     const accountCredPath = path.join(CREDENTIALS_DIR, `${accountName}.json`);
     if (await fileExists(accountCredPath)) {
-      const content = await fs.readFile(accountCredPath, 'utf8');
-      const keys = JSON.parse(content);
-      const key = keys.installed || keys.web;
-      if (!key) throw new Error(`Could not find client secrets in ${accountCredPath}.`);
-      client_id = key.client_id;
-      client_secret = key.client_secret;
+      const parsed = await parseCredentialsFile(accountCredPath);
+      client_id = parsed.client_id;
+      client_secret = parsed.client_secret;
       credentialsPath = accountCredPath;
     } else {
       // Fall back to global credentials
@@ -407,22 +417,16 @@ export async function completeAddAccount(
   let client_id: string, client_secret: string;
 
   if (credentialsPath) {
-    const content = await fs.readFile(credentialsPath, 'utf8');
-    const keys = JSON.parse(content);
-    const key = keys.installed || keys.web;
-    if (!key) throw new Error(`Could not find client secrets in ${credentialsPath}.`);
-    client_id = key.client_id;
-    client_secret = key.client_secret;
+    const parsed = await parseCredentialsFile(credentialsPath);
+    client_id = parsed.client_id;
+    client_secret = parsed.client_secret;
   } else {
     // Check for account-specific credentials
     const accountCredPath = path.join(CREDENTIALS_DIR, `${accountName}.json`);
     if (await fileExists(accountCredPath)) {
-      const content = await fs.readFile(accountCredPath, 'utf8');
-      const keys = JSON.parse(content);
-      const key = keys.installed || keys.web;
-      if (!key) throw new Error(`Could not find client secrets in ${accountCredPath}.`);
-      client_id = key.client_id;
-      client_secret = key.client_secret;
+      const parsed = await parseCredentialsFile(accountCredPath);
+      client_id = parsed.client_id;
+      client_secret = parsed.client_secret;
       credentialsPath = accountCredPath;
     } else {
       const creds = await loadCredentials();

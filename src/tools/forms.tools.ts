@@ -1,7 +1,7 @@
 // forms.tools.ts - Auto-generated tool module
 import { z } from 'zod';
-import { forms_v1, drive_v3 } from 'googleapis';
-import { FastMCPServer, FormsQuestion } from '../types.js';
+import { type forms_v1, type drive_v3 } from 'googleapis';
+import { type FastMCPServer, type FormsQuestion } from '../types.js';
 
 export function registerFormsTools(
   server: FastMCPServer,

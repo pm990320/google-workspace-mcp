@@ -1,10 +1,10 @@
 // sheets.tools.ts - Google Sheets tool module
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { sheets_v4, drive_v3 } from 'googleapis';
+import { type sheets_v4, type drive_v3 } from 'googleapis';
 import * as SheetsHelpers from '../googleSheetsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
-import { FastMCPServer } from '../types.js';
+import { type FastMCPServer } from '../types.js';
 
 export function registerSheetsTools(
   server: FastMCPServer,

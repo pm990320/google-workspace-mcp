@@ -7,13 +7,13 @@ import {
   removeAccount as removeAccountFromRegistry,
   getConfigDir,
   getCredentialsPath,
-  AccountConfig,
+  type AccountConfig,
 } from '../accounts.js';
 import { getErrorMessage } from '../errorHelpers.js';
-import { FastMCPServer } from '../types.js';
+import { type FastMCPServer } from '../types.js';
 
 // Store pending OAuth sessions
-const pendingOAuthSessions: Map<
+const pendingOAuthSessions = new Map<
   string,
   {
     port: number;
@@ -21,7 +21,7 @@ const pendingOAuthSessions: Map<
     resolve: (config: AccountConfig) => void;
     reject: (err: Error) => void;
   }
-> = new Map();
+>();
 
 export function registerAccountsTools(
   server: FastMCPServer,

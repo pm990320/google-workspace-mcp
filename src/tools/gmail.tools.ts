@@ -1,8 +1,8 @@
 // gmail.tools.ts - Auto-generated tool module
 import { z } from 'zod';
-import { gmail_v1 } from 'googleapis';
+import { type gmail_v1 } from 'googleapis';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
-import { FastMCPServer, MessagePart } from '../types.js';
+import { type FastMCPServer, type MessagePart } from '../types.js';
 
 export function registerGmailTools(
   server: FastMCPServer,

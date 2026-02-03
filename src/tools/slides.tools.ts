@@ -1,7 +1,7 @@
 // slides.tools.ts - Auto-generated tool module
 import { z } from 'zod';
-import { slides_v1, drive_v3 } from 'googleapis';
-import { FastMCPServer, PageElement, SlidesRequest } from '../types.js';
+import { type slides_v1, type drive_v3 } from 'googleapis';
+import { type FastMCPServer, type PageElement, type SlidesRequest } from '../types.js';
 
 export function registerSlidesTools(
   server: FastMCPServer,

@@ -1,7 +1,7 @@
 // calendar.tools.ts - Auto-generated tool module
 import { z } from 'zod';
-import { calendar_v3 } from 'googleapis';
-import { FastMCPServer } from '../types.js';
+import { type calendar_v3 } from 'googleapis';
+import { type FastMCPServer } from '../types.js';
 
 export function registerCalendarTools(
   server: FastMCPServer,

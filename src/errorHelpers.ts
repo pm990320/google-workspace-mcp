@@ -6,7 +6,7 @@
 export interface GoogleApiError extends Error {
   code?: number;
   status?: number;
-  errors?: Array<{ message: string; domain: string; reason: string }>;
+  errors?: { message: string; domain: string; reason: string }[];
   response?: {
     data?: unknown;
     status?: number;

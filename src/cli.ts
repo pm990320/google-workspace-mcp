@@ -11,7 +11,7 @@ import {
   getConfigDir,
   getCredentialsPath,
   getAccountClients,
-  AccountClients,
+  type AccountClients,
 } from './accounts.js';
 
 /** Type guard for errors with a message property */
@@ -307,7 +307,7 @@ accountsCmd
         throw e;
       });
 
-    const services: Array<{ name: string; test: (clients: AccountClients) => Promise<unknown> }> = [
+    const services: { name: string; test: (clients: AccountClients) => Promise<unknown> }[] = [
       { name: 'Drive', test: async (clients) => await clients.drive.files.list({ pageSize: 1 }) },
       { name: 'Docs', test: async (clients) => await handle404(clients.docs.documents.get({ documentId: 'test' })) },
       { name: 'Sheets', test: async (clients) => await handle404(clients.sheets.spreadsheets.get({ spreadsheetId: 'test' })) },
@@ -456,7 +456,7 @@ program
   });
 
 // Default command is 'serve' if no command is specified
-program.action(async () => {
+program.action(() => {
   // If no command provided, show help
   program.help();
 });

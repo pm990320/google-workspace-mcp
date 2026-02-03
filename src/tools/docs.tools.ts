@@ -1,29 +1,29 @@
 // docs.tools.ts - Google Docs tool definitions
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { docs_v1, drive_v3 } from 'googleapis';
+import { type docs_v1, type drive_v3 } from 'googleapis';
 import {
   AccountDocumentParameters,
   OptionalRangeParameters,
   TextStyleParameters,
-  TextStyleArgs,
+  type TextStyleArgs,
   ParagraphStyleParameters,
   ApplyTextStyleToolParameters,
-  ApplyTextStyleToolArgs,
+  type ApplyTextStyleToolArgs,
   ApplyParagraphStyleToolParameters,
-  ApplyParagraphStyleToolArgs,
+  type ApplyParagraphStyleToolArgs,
   NotImplementedError,
-  FastMCPServer,
-  StructuralElement,
-  ParagraphElement,
-  Paragraph,
-  DocsTable,
-  TableRow,
-  TableCell,
-  TextRun,
-  DriveComment,
-  DriveReply,
-  DocumentContent,
+  type FastMCPServer,
+  type StructuralElement,
+  type ParagraphElement,
+  type Paragraph,
+  type DocsTable,
+  type TableRow,
+  type TableCell,
+  type TextRun,
+  type DriveComment,
+  type DriveReply,
+  type DocumentContent,
 } from '../types.js';
 import * as GDocsHelpers from '../googleDocsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
@@ -1716,7 +1716,7 @@ export function registerDocsTools(
       elementType: z.enum(['paragraph', 'table', 'list', 'image']).optional(),
       // styleQuery...
     }),
-    execute: async (args, { log }) => {
+    execute: (_args, { log }) => {
       log.warn('findElement tool called but is not implemented.');
       throw new NotImplementedError('Finding elements by complex criteria is not yet implemented.');
     },

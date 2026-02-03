@@ -1,7 +1,7 @@
 // src/types.ts
 import { z } from 'zod';
-import { docs_v1, drive_v3, gmail_v1, slides_v1, forms_v1, sheets_v4, calendar_v3 } from 'googleapis';
-import { FastMCP } from 'fastmcp';
+import { type docs_v1, type drive_v3, type gmail_v1, type slides_v1, type forms_v1, type sheets_v4, type calendar_v3 } from 'googleapis';
+import { type FastMCP } from 'fastmcp';
 
 // --- FastMCP Server Types ---
 // Session auth type - matches FastMCP's internal type
@@ -229,7 +229,7 @@ export const ApplyTextStyleToolParameters = AccountDocumentParameters.extend({
     .union([RangeParameters, TextFindParameter])
     .describe('Specify the target range either by start/end indices or by finding specific text.'),
   style: TextStyleParameters.refine(
-    (styleArgs) => Object.values(styleArgs).some((v) => v !== undefined),
+    (styleArgs) => Object.keys(styleArgs).length > 0,
     { message: 'At least one text style option must be provided.' }
   ).describe('The text styling to apply.'),
 });
@@ -254,11 +254,59 @@ export const ApplyParagraphStyleToolParameters = AccountDocumentParameters.exten
       'Specify the target paragraph either by start/end indices, by finding text within it, or by providing an index within it.'
     ),
   style: ParagraphStyleParameters.refine(
-    (styleArgs) => Object.values(styleArgs).some((v) => v !== undefined),
+    (styleArgs) => Object.keys(styleArgs).length > 0,
     { message: 'At least one paragraph style option must be provided.' }
   ).describe('The paragraph styling to apply.'),
 });
 export type ApplyParagraphStyleToolArgs = z.infer<typeof ApplyParagraphStyleToolParameters>;
+
+// --- OAuth Credential Types ---
+
+/** Google OAuth client configuration (installed or web app) */
+export interface OAuthClientConfig {
+  client_id: string;
+  client_secret: string;
+  redirect_uris?: string[];
+  auth_uri?: string;
+  token_uri?: string;
+  project_id?: string;
+}
+
+/** Google OAuth credentials file format */
+export interface OAuthCredentialsFile {
+  installed?: OAuthClientConfig;
+  web?: OAuthClientConfig;
+}
+
+/** Parsed OAuth credentials with required fields */
+export interface ParsedOAuthCredentials {
+  client_id: string;
+  client_secret: string;
+  redirect_uris: string[];
+}
+
+/** OAuth token response/storage format */
+export interface OAuthTokenData {
+  access_token?: string;
+  refresh_token?: string;
+  scope?: string;
+  token_type?: string;
+  expiry_date?: number;
+}
+
+/** Google Service Account key file format */
+export interface ServiceAccountKey {
+  type: string;
+  project_id: string;
+  private_key_id: string;
+  private_key: string;
+  client_email: string;
+  client_id: string;
+  auth_uri: string;
+  token_uri: string;
+  auth_provider_x509_cert_url: string;
+  client_x509_cert_url: string;
+}
 
 // --- Error Class ---
 // Use FastMCP's UserError for client-facing issues

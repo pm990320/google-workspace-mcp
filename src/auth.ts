@@ -1,12 +1,13 @@
 // src/auth.ts
 import { google } from 'googleapis';
-import type { OAuth2Client } from 'google-auth-library';
+import type { OAuth2Client, Credentials } from 'google-auth-library';
 import { JWT } from 'google-auth-library'; // ADDED: Import for Service Account client
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as readline from 'readline/promises';
 import * as http from 'http';
 import { fileURLToPath } from 'url';
+import { type OAuthCredentialsFile, type ServiceAccountKey } from './types.js';
 
 // --- Calculate paths relative to this script file (ESM way) ---
 const __filename = fileURLToPath(import.meta.url);
@@ -32,7 +33,7 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
   const impersonateUser = process.env.GOOGLE_IMPERSONATE_USER; // Optional: email of user to impersonate
   try {
     const keyFileContent = await fs.readFile(serviceAccountPath, 'utf8');
-    const serviceAccountKey = JSON.parse(keyFileContent);
+    const serviceAccountKey = JSON.parse(keyFileContent) as ServiceAccountKey;
 
     const auth = new JWT({
       email: serviceAccountKey.client_email,
@@ -68,9 +69,9 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
 async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
   try {
     const content = await fs.readFile(TOKEN_PATH);
-    const credentials = JSON.parse(content.toString());
+    const credentials = JSON.parse(content.toString()) as Credentials;
     const { client_secret, client_id, redirect_uris } = await loadClientSecrets();
-    const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris?.[0]);
+    const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     client.setCredentials(credentials);
     return client;
   } catch {
@@ -78,15 +79,22 @@ async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
   }
 }
 
-async function loadClientSecrets() {
+interface ClientSecrets {
+  client_id: string;
+  client_secret: string;
+  redirect_uris: string[];
+  client_type: 'web' | 'installed';
+}
+
+async function loadClientSecrets(): Promise<ClientSecrets> {
   const content = await fs.readFile(CREDENTIALS_PATH);
-  const keys = JSON.parse(content.toString());
-  const key = keys.installed || keys.web;
+  const keys = JSON.parse(content.toString()) as OAuthCredentialsFile;
+  const key = keys.installed ?? keys.web;
   if (!key) throw new Error('Could not find client secrets in credentials.json.');
   return {
     client_id: key.client_id,
     client_secret: key.client_secret,
-    redirect_uris: key.redirect_uris || ['http://localhost:3000/'], // Default for web clients
+    redirect_uris: key.redirect_uris ?? ['http://localhost:3000/'], // Default for web clients
     client_type: keys.web ? 'web' : 'installed',
   };
 }

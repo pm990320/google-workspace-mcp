@@ -1,13 +1,13 @@
 // src/server.ts - Google Workspace MCP Server
 import { FastMCP } from 'fastmcp';
 import {
-  docs_v1,
-  drive_v3,
-  sheets_v4,
-  gmail_v1,
-  calendar_v3,
-  slides_v1,
-  forms_v1,
+  type docs_v1,
+  type drive_v3,
+  type sheets_v4,
+  type gmail_v1,
+  type calendar_v3,
+  type slides_v1,
+  type forms_v1,
 } from 'googleapis';
 
 // Import tool modules

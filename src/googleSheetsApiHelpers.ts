@@ -1,8 +1,8 @@
 // src/googleSheetsApiHelpers.ts
-import { sheets_v4 } from 'googleapis';
+import { type sheets_v4 } from 'googleapis';
 import { UserError } from 'fastmcp';
 import { isGoogleApiError, getErrorMessage } from './errorHelpers.js';
-import { SheetsClient } from './types.js';
+import { type SheetsClient } from './types.js';
 
 /** Cell value type - can be string, number, boolean, or null */
 type CellValue = string | number | boolean | null;
@@ -14,7 +14,7 @@ type CellValue = string | number | boolean | null;
  * Example: "A1" -> {row: 0, col: 0}, "B2" -> {row: 1, col: 1}
  */
 export function a1ToRowCol(a1: string): { row: number; col: number } {
-  const match = a1.match(/^([A-Z]+)(\d+)$/i);
+  const match = /^([A-Z]+)(\d+)$/i.exec(a1);
   if (!match) {
     throw new UserError(`Invalid A1 notation: ${a1}. Expected format like "A1" or "B2"`);
   }
@@ -311,7 +311,7 @@ export async function formatCells(
     if (sheetName) {
       // Find the sheet by name
       const sheet = metadata.sheets?.find((s) => s.properties?.title === sheetName);
-      if (!sheet || !sheet.properties?.sheetId) {
+      if (!sheet?.properties?.sheetId) {
         throw new UserError(`Sheet "${sheetName}" not found in spreadsheet.`);
       }
       sheetId = sheet.properties.sheetId;
@@ -329,7 +329,7 @@ export async function formatCells(
     }
 
     // Parse A1 range to get row/column indices
-    const rangeMatch = a1Range.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i);
+    const rangeMatch = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i.exec(a1Range);
     if (!rangeMatch) {
       throw new UserError(`Invalid range format: ${a1Range}. Expected format like "A1" or "A1:B2"`);
     }

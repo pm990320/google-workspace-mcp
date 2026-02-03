@@ -1,6 +1,6 @@
 // src/serverWrapper.ts - Server wrapper for read-only mode enforcement
 import type { Tool, ToolParameters, Context } from 'fastmcp';
-import { FastMCP } from 'fastmcp';
+import { type FastMCP } from 'fastmcp';
 import type { FastMCPSessionAuth } from './types.js';
 
 export interface ServerConfig {
@@ -51,13 +51,15 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
     if (!isReadOnly) {
       // Wrap the execute function to block write operations at runtime
       const toolName = tool.name;
-      const blockedExecute = async (
+      const blockedExecute = (
         _args: unknown,
         _context: Context<T>
       ): Promise<string> => {
-        throw new Error(
-          `Tool "${toolName}" is disabled: server is running in read-only mode. ` +
-            `This tool would modify data. Restart the server without --read-only to enable write operations.`
+        return Promise.reject(
+          new Error(
+            `Tool "${toolName}" is disabled: server is running in read-only mode. ` +
+              `This tool would modify data. Restart the server without --read-only to enable write operations.`
+          )
         );
       };
 
@@ -68,10 +70,10 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
         description: `[READ-ONLY MODE - DISABLED] ${tool.description || ''}`,
       };
 
-      return originalAddTool(blockedTool);
+      originalAddTool(blockedTool); return;
     }
 
-    return originalAddTool(tool);
+    originalAddTool(tool);
   };
 
   return server;
