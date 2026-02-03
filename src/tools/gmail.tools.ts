@@ -230,6 +230,39 @@ export function registerGmailTools(options: GmailToolOptions) {
       try {
         const gmail = await getGmailClient(args.account);
 
+        let threadId: string | undefined;
+        let inReplyTo: string | undefined;
+        let references: string | undefined;
+
+        // If replying to a message, get thread info and headers for proper threading
+        if (args.replyToMessageId) {
+          const originalMessage = await gmail.users.messages.get({
+            userId: 'me',
+            id: args.replyToMessageId,
+            format: 'metadata',
+            metadataHeaders: ['Message-ID', 'References'],
+          });
+
+          threadId = originalMessage.data.threadId ?? undefined;
+
+          // Get the Message-ID header for In-Reply-To and References
+          const headers = originalMessage.data.payload?.headers ?? [];
+          const messageIdHeader = headers.find(
+            (h) => h.name?.toLowerCase() === 'message-id'
+          )?.value;
+          const referencesHeader = headers.find(
+            (h) => h.name?.toLowerCase() === 'references'
+          )?.value;
+
+          if (messageIdHeader) {
+            inReplyTo = messageIdHeader;
+            // References should include the original References header (if any) plus the Message-ID
+            references = referencesHeader
+              ? `${referencesHeader} ${messageIdHeader}`
+              : messageIdHeader;
+          }
+        }
+
         // Build the email
         let emailContent = '';
 
@@ -237,6 +270,8 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
         if (args.bcc) emailContent += `Bcc: ${args.bcc}\r\n`;
         emailContent += `Subject: ${args.subject}\r\n`;
+        if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
+        if (references) emailContent += `References: ${references}\r\n`;
         emailContent += 'MIME-Version: 1.0\r\n';
 
         if (args.isHtml) {
@@ -258,10 +293,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           userId: 'me',
           requestBody: {
             raw: encodedEmail,
-            threadId: args.replyToMessageId
-              ? (await gmail.users.messages.get({ userId: 'me', id: args.replyToMessageId })).data
-                  .threadId
-              : undefined,
+            threadId: threadId,
           },
         });
 
@@ -489,7 +521,8 @@ export function registerGmailTools(options: GmailToolOptions) {
   // --- Create Gmail Draft ---
   server.addTool({
     name: 'createGmailDraft',
-    description: 'Create a draft email in Gmail.',
+    description:
+      'Create a draft email in Gmail. Supports threading by providing replyToMessageId to create a draft reply.',
     annotations: {
       title: 'Create Gmail Draft',
       readOnlyHint: false,
@@ -504,15 +537,56 @@ export function registerGmailTools(options: GmailToolOptions) {
       body: z.string().describe('Email body content'),
       cc: z.string().optional().describe('CC recipients'),
       isHtml: z.boolean().optional().default(false).describe('Whether body is HTML'),
+      replyToMessageId: z
+        .string()
+        .optional()
+        .describe(
+          'Message ID to reply to (for threading). The draft will appear in the same thread as the original message.'
+        ),
     }),
     async execute(args, { log: _log }) {
       try {
         const gmail = await getGmailClient(args.account);
 
+        let threadId: string | undefined;
+        let inReplyTo: string | undefined;
+        let references: string | undefined;
+
+        // If replying to a message, get thread info and headers for proper threading
+        if (args.replyToMessageId) {
+          const originalMessage = await gmail.users.messages.get({
+            userId: 'me',
+            id: args.replyToMessageId,
+            format: 'metadata',
+            metadataHeaders: ['Message-ID', 'References'],
+          });
+
+          threadId = originalMessage.data.threadId ?? undefined;
+
+          // Get the Message-ID header for In-Reply-To and References
+          const headers = originalMessage.data.payload?.headers ?? [];
+          const messageIdHeader = headers.find(
+            (h) => h.name?.toLowerCase() === 'message-id'
+          )?.value;
+          const referencesHeader = headers.find(
+            (h) => h.name?.toLowerCase() === 'references'
+          )?.value;
+
+          if (messageIdHeader) {
+            inReplyTo = messageIdHeader;
+            // References should include the original References header (if any) plus the Message-ID
+            references = referencesHeader
+              ? `${referencesHeader} ${messageIdHeader}`
+              : messageIdHeader;
+          }
+        }
+
         let emailContent = '';
         emailContent += `To: ${args.to}\r\n`;
         if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
         emailContent += `Subject: ${args.subject}\r\n`;
+        if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
+        if (references) emailContent += `References: ${references}\r\n`;
         emailContent += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
         emailContent += `\r\n${args.body}`;
 
@@ -525,7 +599,10 @@ export function registerGmailTools(options: GmailToolOptions) {
         const response = await gmail.users.drafts.create({
           userId: 'me',
           requestBody: {
-            message: { raw: encodedEmail },
+            message: {
+              raw: encodedEmail,
+              threadId: threadId,
+            },
           },
         });
 
@@ -537,6 +614,9 @@ export function registerGmailTools(options: GmailToolOptions) {
         result += `Subject: ${args.subject}\n`;
         result += `Draft ID: ${response.data.id}\n`;
         result += `Message ID: ${response.data.message?.id}\n`;
+        if (threadId) {
+          result += `Thread ID: ${threadId} (draft will appear in thread)\n`;
+        }
         result += `\nView drafts: ${draftsLink}`;
 
         return result;
@@ -574,6 +654,83 @@ export function registerGmailTools(options: GmailToolOptions) {
         return `Successfully moved message ${args.messageId} to trash.\n\nThe message will be automatically deleted after 30 days.`;
       } catch (error: unknown) {
         throw new Error(formatToolError('deleteGmailMessage', error));
+      }
+    },
+  });
+
+  // --- Send Gmail Draft ---
+  server.addTool({
+    name: 'sendGmailDraft',
+    description: 'Send an existing Gmail draft. The draft will be sent and removed from drafts.',
+    annotations: {
+      title: 'Send Gmail Draft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to send (from createGmailDraft response)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.drafts.send({
+          userId: 'me',
+          requestBody: {
+            id: args.draftId,
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const link = response.data.id
+          ? getGmailMessageUrl(response.data.id, accountEmail)
+          : undefined;
+
+        let result = 'Successfully sent draft.\n\n';
+        result += `Message ID: ${response.data.id}\n`;
+        result += `Thread ID: ${response.data.threadId}\n`;
+        result += `Labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
+        if (link) {
+          result += `\nView sent message: ${link}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('sendGmailDraft', error));
+      }
+    },
+  });
+
+  // --- Delete Gmail Draft ---
+  server.addTool({
+    name: 'deleteGmailDraft',
+    description: 'Permanently delete a Gmail draft. This action cannot be undone.',
+    annotations: {
+      title: 'Delete Gmail Draft',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to delete (from createGmailDraft response)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        await gmail.users.drafts.delete({
+          userId: 'me',
+          id: args.draftId,
+        });
+
+        return `Successfully deleted draft ${args.draftId}.\n\nNote: Draft deletion is permanent and cannot be undone.`;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('deleteGmailDraft', error));
       }
     },
   });
