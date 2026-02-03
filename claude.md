@@ -1,11 +1,24 @@
 # Google Docs MCP Server
 
-FastMCP server with 42 tools for Google Docs, Sheets, and Drive.
+FastMCP server with 45 tools for Google Docs, Sheets, and Drive.
+
+## Multi-Account Support
+
+All tools require an `account` parameter. Use `listAccounts` to see available accounts.
+
+| Tool | Description |
+|------|-------------|
+| `listAccounts` | List all connected Google accounts |
+| `addAccount` | Add a new Google account (returns OAuth URL) |
+| `removeAccount` | Remove a connected account |
+
+Config stored in `~/.google-mcp/` (accounts.json, tokens/, credentials.json)
 
 ## Tool Categories
 
 | Category | Count | Examples |
 |----------|-------|----------|
+| Accounts | 3 | `listAccounts`, `addAccount`, `removeAccount` |
 | Docs | 5 | `readGoogleDoc`, `appendToGoogleDoc`, `insertText`, `deleteRange`, `listDocumentTabs` |
 | Formatting | 3 | `applyTextStyle`, `applyParagraphStyle`, `formatMatchingText` |
 | Structure | 7 | `insertTable`, `insertPageBreak`, `insertImageFromUrl`, `insertLocalImage`, `editTableCell`*, `findElement`*, `fixListFormatting`* |
@@ -24,6 +37,7 @@ FastMCP server with 42 tools for Google Docs, Sheets, and Drive.
 
 ## Parameter Patterns
 
+- **Account:** Required for all tools. Use `listAccounts` to see available account names.
 - **Document ID:** Extract from URL: `docs.google.com/document/d/DOCUMENT_ID/edit`
 - **Text targeting:** Use `textToFind` + `matchInstance` OR `startIndex`/`endIndex`
 - **Colors:** Hex format `#RRGGBB` or `#RGB`
@@ -35,10 +49,11 @@ FastMCP server with 42 tools for Google Docs, Sheets, and Drive.
 
 | File | Contains |
 |------|----------|
+| `src/accounts.ts` | Multi-account management, OAuth flow, token storage |
 | `src/types.ts` | Zod schemas, hex color validation, style parameter definitions |
 | `src/googleDocsApiHelpers.ts` | `findTextRange`, `executeBatchUpdate`, style request builders |
 | `src/googleSheetsApiHelpers.ts` | A1 notation parsing, range operations |
-| `src/server.ts` | All 42 tool definitions with full parameter schemas |
+| `src/server.ts` | All 45 tool definitions with full parameter schemas |
 
 ## See Also
 

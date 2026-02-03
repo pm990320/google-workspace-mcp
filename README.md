@@ -61,6 +61,12 @@ This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp
 - **File Operations:** Move (`moveFile`), copy (`copyFile`), rename (`renameFile`), delete (`deleteFile`)
 - **Document Creation:** Create new docs (`createDocument`) or from templates (`createFromTemplate`)
 
+### Multi-Account Support
+
+- **Multiple Google Accounts:** Connect multiple Google accounts (personal, work, etc.) to a single server instance
+- **Account Management:** Add, list, and remove accounts with `addAccount`, `listAccounts`, `removeAccount`
+- **Explicit Account Selection:** Every tool requires specifying which account to use (no implicit defaults)
+
 ### Integration
 
 - **Google Authentication:** Secure OAuth 2.0 authentication with full Drive, Docs, and Sheets access
@@ -99,8 +105,9 @@ This server needs permission to talk to Google APIs on your behalf. You'll creat
     - Search for "**Google Sheets API**" and click on it. Then click the "**ENABLE**" button.
     - Search for "**Google Drive API**" and click on it. Then click the "**ENABLE**" button (this is often needed for finding files or permissions).
 4.  **Configure OAuth Consent Screen:** This screen tells users (usually just you) what your app wants permission for.
-    - On the left menu, click "APIs & Services" -> "**OAuth consent screen**".
+    - On the left menu, click "APIs & Services" -> "**OAuth consent screen**" (or search for "**Google Auth Platform**" and go to "Audience").
     - Choose User Type: Select "**External**" and click "CREATE".
+      - ⚠️ **Important:** If you're in a Google Workspace organization and select "Internal", only users within your organization can authorize. Choose "External" if you need to connect accounts from multiple organizations/domains.
     - Fill in App Information:
       - **App name:** Give it a name users will see (e.g., "Claude Docs MCP Access").
       - **User support email:** Select your email address.
@@ -112,7 +119,8 @@ This server needs permission to talk to Google APIs on your behalf. You'll creat
       - `https://www.googleapis.com/auth/drive.file` (Allows access to specific files opened/created by the app)
       - Click "**UPDATE**".
     - Click "**SAVE AND CONTINUE**".
-    - **Test Users:** Click "**ADD USERS**". Enter the same Google email address you are logged in with. Click "**ADD**". This allows _you_ to use the app while it's in "testing" mode.
+    - **Test Users:** Click "**ADD USERS**". Add **all** the Google email addresses you plan to connect (including accounts from different domains). Click "**ADD**". This allows those users to authorize while the app is in "testing" mode.
+      - ⚠️ **Multi-account setup:** If you want to connect multiple Google accounts (e.g., `work@company.com` and `personal@gmail.com`), add each email address as a test user.
     - Click "**SAVE AND CONTINUE**". Review the summary and click "**BACK TO DASHBOARD**".
 5.  **Create Credentials (The Keys!):**
     - On the left menu, click "APIs & Services" -> "**Credentials**".
@@ -185,6 +193,52 @@ Now you need to run the server once manually to grant it permission to access yo
     - It will then finish starting and likely print "Awaiting MCP client connection via stdio..." or similar, and then exit (or you can press `Ctrl+C` to stop it).
 8.  ✅ **Check:** You should now see a new file named `token.json` in your `mcp-googledocs-server` folder.
 9.  ⚠️ **SECURITY WARNING:** This `token.json` file contains the key that allows the server to access your Google account _without_ asking again. Protect it like a password. **Do not commit it to GitHub.** The included `.gitignore` file should prevent this automatically.
+
+### Step 5b: Multi-Account Setup (Optional)
+
+This server supports connecting multiple Google accounts simultaneously. This is useful if you have separate work and personal accounts, or need to access documents across different Google Workspace organizations.
+
+**How It Works:**
+- Accounts are stored in `~/.google-mcp/` with individual token files
+- Each tool requires an `account` parameter to specify which account to use
+- Use `listAccounts` to see all connected accounts
+- Use `addAccount` to add new accounts, `removeAccount` to remove them
+
+**Initial Setup:**
+
+1. **Move your credentials file:**
+   ```bash
+   mkdir -p ~/.google-mcp
+   cp credentials.json ~/.google-mcp/credentials.json
+   ```
+
+2. **Add your first account** using Claude Desktop or another MCP client:
+   - Call the `addAccount` tool with a name for the account (e.g., "work" or "personal")
+   - The tool returns an authorization URL - open it in your browser
+   - Sign in with the Google account you want to add
+   - Authorize the app when prompted
+   - The account is now available for use
+
+3. **Add additional accounts** by repeating step 2 with different account names
+
+**Example Usage:**
+```
+"List all my connected Google accounts using listAccounts"
+"Add a new account named 'personal' using addAccount"
+"Read document YOUR_DOC_ID using account 'work'"
+"List my Google Docs in account 'personal'"
+```
+
+**Troubleshooting Multi-Account OAuth:**
+
+If you get an error like **"Access blocked: App can only be used within its organization"** (error 403: org_internal), your OAuth consent screen is set to "Internal". To fix this:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **Google Auth Platform** → **Audience**
+2. Change **User type** from "Internal" to "**External**"
+3. Add all email addresses you want to connect as **Test Users** (under the "Testing" section)
+4. Retry the `addAccount` flow
+
+**Note:** Apps in "Testing" mode are limited to 100 test users total. If you need more, you'll need to submit your app for verification.
 
 ### Alternative: Service Account with Domain-Wide Delegation (Enterprise)
 
@@ -486,8 +540,13 @@ While this MCP server provides comprehensive Google Docs, Sheets, and Drive func
 - **Google Authorization Errors:**
   - Ensure you enabled the correct APIs (Docs, Sheets, Drive).
   - Make sure you added your email as a Test User on the OAuth Consent Screen.
-  - Verify the `credentials.json` file is correctly placed in the project root.
+  - Verify the `credentials.json` file is correctly placed in the project root (or `~/.google-mcp/credentials.json` for multi-account setup).
   - **If you're upgrading from an older version:** You may need to delete your existing `token.json` file and re-authenticate to grant the new Sheets API scope.
+- **"Access blocked: org_internal" Error (403):**
+  - This occurs when your OAuth consent screen is set to "Internal" but you're trying to authorize an account from a different Google Workspace organization.
+  - **Fix:** Go to Google Cloud Console → Google Auth Platform → Audience → Change User type to "External"
+  - Add all the email addresses you want to authorize as Test Users
+  - See "Troubleshooting Multi-Account OAuth" in Step 5b for detailed instructions.
 - **Tab-related Errors:**
   - If you get "Tab with ID not found", use `listDocumentTabs` to see all available tab IDs
   - Ensure you're using the correct tab ID format (typically a short alphanumeric string)
