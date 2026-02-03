@@ -10,6 +10,11 @@ export function registerCalendarTools(
   server.addTool({
     name: 'listCalendars',
     description: 'List all calendars accessible by the account.',
+    annotations: {
+      title: 'List Calendars',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
     }),
@@ -40,6 +45,11 @@ export function registerCalendarTools(
   server.addTool({
     name: 'listCalendarEvents',
     description: 'List events from a calendar within a time range.',
+    annotations: {
+      title: 'List Calendar Events',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       calendarId: z
@@ -116,6 +126,11 @@ export function registerCalendarTools(
   server.addTool({
     name: 'getCalendarEvent',
     description: 'Get details of a specific calendar event.',
+    annotations: {
+      title: 'Get Calendar Event',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       calendarId: z.string().optional().default('primary').describe('Calendar ID'),
@@ -159,6 +174,13 @@ export function registerCalendarTools(
   server.addTool({
     name: 'createCalendarEvent',
     description: 'Create a new calendar event.',
+    annotations: {
+      title: 'Create Calendar Event',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       calendarId: z.string().optional().default('primary').describe('Calendar ID'),
@@ -218,6 +240,13 @@ export function registerCalendarTools(
   server.addTool({
     name: 'updateCalendarEvent',
     description: 'Update an existing calendar event.',
+    annotations: {
+      title: 'Update Calendar Event',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       calendarId: z.string().optional().default('primary').describe('Calendar ID'),
@@ -283,6 +312,13 @@ export function registerCalendarTools(
   server.addTool({
     name: 'deleteCalendarEvent',
     description: 'Delete a calendar event.',
+    annotations: {
+      title: 'Delete Calendar Event',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       calendarId: z.string().optional().default('primary').describe('Calendar ID'),

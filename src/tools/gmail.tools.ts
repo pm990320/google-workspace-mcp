@@ -11,6 +11,11 @@ export function registerGmailTools(
     name: 'listGmailMessages',
     description:
       'List email messages from Gmail inbox or other labels. Returns message IDs and snippets.',
+    annotations: {
+      title: 'List Gmail Messages',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       maxResults: z
@@ -69,6 +74,11 @@ export function registerGmailTools(
     name: 'readGmailMessage',
     description:
       'Read a specific Gmail message by ID. Returns full message content including headers, body, and attachments info.',
+    annotations: {
+      title: 'Read Gmail Message',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       messageId: z.string().describe('The ID of the message to read'),
@@ -171,6 +181,13 @@ export function registerGmailTools(
   server.addTool({
     name: 'sendGmailMessage',
     description: 'Send an email via Gmail. Supports plain text and HTML content.',
+    annotations: {
+      title: 'Send Gmail Message',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
@@ -240,6 +257,11 @@ export function registerGmailTools(
   server.addTool({
     name: 'searchGmail',
     description: 'Search Gmail using Gmail search syntax. Returns matching messages with snippets.',
+    annotations: {
+      title: 'Search Gmail',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       query: z
@@ -306,6 +328,11 @@ export function registerGmailTools(
   server.addTool({
     name: 'listGmailLabels',
     description: 'List all Gmail labels (folders) for the account.',
+    annotations: {
+      title: 'List Gmail Labels',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
     }),
@@ -335,6 +362,13 @@ export function registerGmailTools(
     name: 'modifyGmailLabels',
     description:
       'Add or remove labels from a Gmail message. Use to archive, mark as read/unread, star, etc.',
+    annotations: {
+      title: 'Modify Gmail Labels',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       messageId: z.string().describe('The message ID to modify'),
@@ -375,6 +409,13 @@ export function registerGmailTools(
   server.addTool({
     name: 'createGmailDraft',
     description: 'Create a draft email in Gmail.',
+    annotations: {
+      title: 'Create Gmail Draft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       to: z.string().describe('Recipient email address(es)'),
@@ -422,6 +463,13 @@ export function registerGmailTools(
   server.addTool({
     name: 'deleteGmailMessage',
     description: 'Move a Gmail message to trash or permanently delete it.',
+    annotations: {
+      title: 'Delete Gmail Message',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       messageId: z.string().describe('The message ID to delete'),

@@ -13,6 +13,11 @@ export function registerSheetsTools(
   server.addTool({
     name: 'readSpreadsheet',
     description: 'Reads data from a specific range in a Google Spreadsheet.',
+    annotations: {
+      title: 'Read Spreadsheet',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -59,6 +64,13 @@ export function registerSheetsTools(
     name: 'writeSpreadsheet',
     description:
       'Writes data to a specific range in a Google Spreadsheet. Overwrites existing data in the range.',
+    annotations: {
+      title: 'Write Spreadsheet',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -109,6 +121,13 @@ export function registerSheetsTools(
   server.addTool({
     name: 'appendSpreadsheetRows',
     description: 'Appends rows of data to the end of a sheet in a Google Spreadsheet.',
+    annotations: {
+      title: 'Append Spreadsheet Rows',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -163,6 +182,13 @@ export function registerSheetsTools(
   server.addTool({
     name: 'clearSpreadsheetRange',
     description: 'Clears all values from a specific range in a Google Spreadsheet.',
+    annotations: {
+      title: 'Clear Spreadsheet Range',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -196,6 +222,11 @@ export function registerSheetsTools(
   server.addTool({
     name: 'getSpreadsheetInfo',
     description: 'Gets detailed information about a Google Spreadsheet including all sheets/tabs.',
+    annotations: {
+      title: 'Get Spreadsheet Info',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -243,6 +274,13 @@ export function registerSheetsTools(
   server.addTool({
     name: 'addSpreadsheetSheet',
     description: 'Adds a new sheet/tab to an existing Google Spreadsheet.',
+    annotations: {
+      title: 'Add Spreadsheet Sheet',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -280,6 +318,13 @@ export function registerSheetsTools(
   server.addTool({
     name: 'createSpreadsheet',
     description: 'Creates a new Google Spreadsheet.',
+    annotations: {
+      title: 'Create Spreadsheet',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -361,6 +406,11 @@ export function registerSheetsTools(
   server.addTool({
     name: 'listGoogleSheets',
     description: 'Lists Google Spreadsheets from your Google Drive with optional filtering.',
+    annotations: {
+      title: 'List Google Sheets',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()

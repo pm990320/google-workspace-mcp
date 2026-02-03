@@ -11,6 +11,11 @@ export function registerFormsTools(
   server.addTool({
     name: 'listForms',
     description: 'List Google Forms in Drive.',
+    annotations: {
+      title: 'List Forms',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
@@ -45,6 +50,11 @@ export function registerFormsTools(
   server.addTool({
     name: 'readForm',
     description: 'Read the structure and questions of a Google Form.',
+    annotations: {
+      title: 'Read Form',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       formId: z.string().describe('Form ID (from URL)'),
@@ -106,6 +116,11 @@ export function registerFormsTools(
   server.addTool({
     name: 'getFormResponses',
     description: 'Get responses submitted to a Google Form.',
+    annotations: {
+      title: 'Get Form Responses',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       formId: z.string().describe('Form ID'),
@@ -154,6 +169,13 @@ export function registerFormsTools(
   server.addTool({
     name: 'createForm',
     description: 'Create a new Google Form.',
+    annotations: {
+      title: 'Create Form',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       title: z.string().describe('Form title'),
@@ -207,6 +229,13 @@ export function registerFormsTools(
   server.addTool({
     name: 'addFormQuestion',
     description: 'Add a question to a Google Form.',
+    annotations: {
+      title: 'Add Form Question',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       formId: z.string().describe('Form ID'),

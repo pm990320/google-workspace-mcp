@@ -30,6 +30,11 @@ export function registerAccountsTools(
     name: 'listAccounts',
     description: 'Lists all configured Google accounts that can be used with this MCP server.',
     parameters: z.object({}),
+    annotations: {
+      title: 'List Accounts',
+      readOnlyHint: true,
+      openWorldHint: false,
+    },
     execute: async (args, { log }) => {
       log.info('Listing configured accounts');
       await ensureAccountsInitialized();
@@ -65,6 +70,13 @@ export function registerAccountsTools(
     name: 'addAccount',
     description:
       'Starts the OAuth flow to add a new Google account. Returns an authorization URL that must be opened in a browser. After authorizing, the account will be added automatically. The account name must be unique and contain only letters, numbers, underscores, and hyphens. Optionally, you can specify a custom credentials file to use a different OAuth app for this account.',
+    annotations: {
+      title: 'Add Account',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       name: z
         .string()
@@ -154,6 +166,13 @@ After authorizing, the account will be added automatically. Server listening on 
     name: 'removeAccount',
     description:
       'Removes a Google account from the MCP server. This deletes the stored credentials for the account.',
+    annotations: {
+      title: 'Remove Account',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     parameters: z.object({
       name: z.string().min(1).describe('The name of the account to remove'),
     }),

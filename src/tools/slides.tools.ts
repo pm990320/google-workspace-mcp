@@ -11,6 +11,11 @@ export function registerSlidesTools(
   server.addTool({
     name: 'listPresentations',
     description: 'List Google Slides presentations in Drive.',
+    annotations: {
+      title: 'List Presentations',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
@@ -45,6 +50,11 @@ export function registerSlidesTools(
   server.addTool({
     name: 'readPresentation',
     description: 'Read the content and structure of a Google Slides presentation.',
+    annotations: {
+      title: 'Read Presentation',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       presentationId: z.string().describe('Presentation ID (from URL)'),
@@ -97,6 +107,13 @@ export function registerSlidesTools(
   server.addTool({
     name: 'createPresentation',
     description: 'Create a new Google Slides presentation.',
+    annotations: {
+      title: 'Create Presentation',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       title: z.string().describe('Presentation title'),
@@ -127,6 +144,13 @@ export function registerSlidesTools(
   server.addTool({
     name: 'addSlide',
     description: 'Add a new slide to a presentation.',
+    annotations: {
+      title: 'Add Slide',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       presentationId: z.string().describe('Presentation ID'),
@@ -204,6 +228,13 @@ export function registerSlidesTools(
   server.addTool({
     name: 'addTextToSlide',
     description: 'Add a text box with content to a slide.',
+    annotations: {
+      title: 'Add Text to Slide',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       presentationId: z.string().describe('Presentation ID'),

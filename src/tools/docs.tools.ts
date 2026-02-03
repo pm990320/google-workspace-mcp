@@ -168,6 +168,11 @@ export function registerDocsTools(
     name: 'readGoogleDoc',
     description:
       'Reads the content of a specific Google Document, optionally returning structured data.',
+    annotations: {
+      title: 'Read Google Doc',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       format: z
         .enum(['text', 'json', 'markdown'])
@@ -335,6 +340,13 @@ export function registerDocsTools(
     name: 'editGoogleDoc',
     description:
       "Find and replace text in a Google Document. Similar to Claude Code's Edit tool - finds exact text and replaces it. Use this for surgical edits to documents.",
+    annotations: {
+      title: 'Edit Google Doc',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       documentId: z.string().describe('The Google Doc document ID'),
@@ -456,6 +468,11 @@ export function registerDocsTools(
     name: 'listDocumentTabs',
     description:
       'Lists all tabs in a Google Document, including their hierarchy, IDs, and structure.',
+    annotations: {
+      title: 'List Document Tabs',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       includeContent: z
         .boolean()
@@ -556,6 +573,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'appendToGoogleDoc',
     description: 'Appends text to the very end of a specific Google Document or tab.',
+    annotations: {
+      title: 'Append to Google Doc',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       textToAppend: z.string().min(1).describe('The text to add to the end.'),
       addNewlineIfNeeded: z
@@ -646,6 +670,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'insertText',
     description: 'Inserts text at a specific index within the document body or a specific tab.',
+    annotations: {
+      title: 'Insert Text',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       textToInsert: z.string().min(1).describe('The text to insert.'),
       index: z
@@ -707,6 +738,13 @@ export function registerDocsTools(
     name: 'deleteRange',
     description:
       'Deletes content within a specified range (start index inclusive, end index exclusive) from the document or a specific tab.',
+    annotations: {
+      title: 'Delete Range',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       startIndex: z
         .number()
@@ -774,6 +812,13 @@ export function registerDocsTools(
     name: 'applyTextStyle',
     description:
       'Applies character-level formatting (bold, color, font, etc.) to a specific range or found text.',
+    annotations: {
+      title: 'Apply Text Style',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: ApplyTextStyleToolParameters,
     execute: async (args: ApplyTextStyleToolArgs, { log }) => {
       const docs = await getDocsClient(args.account);
@@ -837,6 +882,13 @@ export function registerDocsTools(
     name: 'applyParagraphStyle',
     description:
       'Applies paragraph-level formatting (alignment, spacing, named styles like Heading 1) to the paragraph(s) containing specific text, an index, or a range.',
+    annotations: {
+      title: 'Apply Paragraph Style',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: ApplyParagraphStyleToolParameters,
     execute: async (args: ApplyParagraphStyleToolArgs, { log }) => {
       const docs = await getDocsClient(args.account);
@@ -955,6 +1007,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'insertTable',
     description: 'Inserts a new table with the specified dimensions at a given index.',
+    annotations: {
+      title: 'Insert Table',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       rows: z.number().int().min(1).describe('Number of rows for the new table.'),
       columns: z.number().int().min(1).describe('Number of columns for the new table.'),
@@ -986,6 +1045,13 @@ export function registerDocsTools(
     name: 'editTableCell',
     description:
       'Edits the content and/or basic style of a specific table cell. Requires knowing table start index.',
+    annotations: {
+      title: 'Edit Table Cell',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       tableStartIndex: z
         .number()
@@ -1021,6 +1087,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'insertPageBreak',
     description: 'Inserts a page break at the specified index.',
+    annotations: {
+      title: 'Insert Page Break',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       index: z
         .number()
@@ -1051,6 +1124,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'insertImageFromUrl',
     description: 'Inserts an inline image into a Google Document from a publicly accessible URL.',
+    annotations: {
+      title: 'Insert Image From URL',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       imageUrl: z
         .string()
@@ -1099,6 +1179,13 @@ export function registerDocsTools(
     name: 'insertLocalImage',
     description:
       'Uploads a local image file to Google Drive and inserts it into a Google Document. The image will be uploaded to the same folder as the document (or optionally to a specified folder).',
+    annotations: {
+      title: 'Insert Local Image',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       localImagePath: z
         .string()
@@ -1189,6 +1276,13 @@ export function registerDocsTools(
     name: 'fixListFormatting',
     description:
       'EXPERIMENTAL: Attempts to detect paragraphs that look like lists (e.g., starting with -, *, 1.) and convert them to proper Google Docs bulleted or numbered lists. Best used on specific sections.',
+    annotations: {
+      title: 'Fix List Formatting',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       // Optional range to limit the scope, otherwise scans whole doc (potentially slow/risky)
       range: OptionalRangeParameters.optional().describe(
@@ -1225,6 +1319,11 @@ export function registerDocsTools(
   server.addTool({
     name: 'listComments',
     description: 'Lists all comments in a Google Document.',
+    annotations: {
+      title: 'List Comments',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters,
     execute: async (args, { log }) => {
       log.info(`Listing comments for document ${args.documentId}`);
@@ -1285,6 +1384,11 @@ export function registerDocsTools(
   server.addTool({
     name: 'getComment',
     description: 'Gets a specific comment with its full thread of replies.',
+    annotations: {
+      title: 'Get Comment',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       commentId: z.string().describe('The ID of the comment to retrieve'),
     }),
@@ -1336,6 +1440,13 @@ export function registerDocsTools(
     name: 'addComment',
     description:
       'Adds a comment anchored to a specific text range in the document. NOTE: Due to Google API limitations, comments created programmatically appear in the "All Comments" list but are not visibly anchored to text in the document UI (they show "original content deleted"). However, replies, resolve, and delete operations work on all comments including manually-created ones.',
+    annotations: {
+      title: 'Add Comment',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       startIndex: z
         .number()
@@ -1420,6 +1531,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'replyToComment',
     description: 'Adds a reply to an existing comment.',
+    annotations: {
+      title: 'Reply to Comment',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       commentId: z.string().describe('The ID of the comment to reply to'),
       replyText: z.string().min(1).describe('The content of the reply'),
@@ -1451,6 +1569,13 @@ export function registerDocsTools(
     name: 'resolveComment',
     description:
       'Marks a comment as resolved. NOTE: Due to Google API limitations, the Drive API does not support resolving comments on Google Docs files. This operation will attempt to update the comment but the resolved status may not persist in the UI. Comments can be resolved manually in the Google Docs interface.',
+    annotations: {
+      title: 'Resolve Comment',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       commentId: z.string().describe('The ID of the comment to resolve'),
     }),
@@ -1504,6 +1629,13 @@ export function registerDocsTools(
   server.addTool({
     name: 'deleteComment',
     description: 'Deletes a comment from the document.',
+    annotations: {
+      title: 'Delete Comment',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       commentId: z.string().describe('The ID of the comment to delete'),
     }),
@@ -1530,6 +1662,11 @@ export function registerDocsTools(
     name: 'findElement',
     description:
       'Finds elements (paragraphs, tables, etc.) based on various criteria. (Not Implemented)',
+    annotations: {
+      title: 'Find Element',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters.extend({
       // Define complex query parameters...
       textQuery: z.string().optional(),
@@ -1547,6 +1684,13 @@ export function registerDocsTools(
     name: 'formatMatchingText',
     description:
       'Finds specific text within a Google Document and applies character formatting (bold, italics, color, etc.) to the specified instance.',
+    annotations: {
+      title: 'Format Matching Text',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z
       .object({
         account: z

@@ -13,6 +13,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'listGoogleDocs',
     description: 'Lists Google Documents from your Google Drive with optional filtering.',
+    annotations: {
+      title: 'List Google Docs',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -90,6 +95,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'searchGoogleDocs',
     description: 'Searches for Google Documents by name, content, or other criteria.',
+    annotations: {
+      title: 'Search Google Docs',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -179,6 +189,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'getRecentGoogleDocs',
     description: 'Gets the most recently modified Google Documents.',
+    annotations: {
+      title: 'Get Recent Google Docs',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -259,6 +274,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'getDocumentInfo',
     description: 'Gets detailed information about a specific Google Document.',
+    annotations: {
+      title: 'Get Document Info',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: AccountDocumentParameters,
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
@@ -323,6 +343,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'createFolder',
     description: 'Creates a new folder in Google Drive.',
+    annotations: {
+      title: 'Create Folder',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -376,6 +403,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'listFolderContents',
     description: 'Lists the contents of a specific folder in Google Drive.',
+    annotations: {
+      title: 'List Folder Contents',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -488,6 +520,11 @@ export function registerDriveTools(
   server.addTool({
     name: 'getFolderInfo',
     description: 'Gets detailed information about a specific folder in Google Drive.',
+    annotations: {
+      title: 'Get Folder Info',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -563,6 +600,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'moveFile',
     description: 'Moves a file or folder to a different location in Google Drive.',
+    annotations: {
+      title: 'Move File',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -624,6 +668,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'copyFile',
     description: 'Creates a copy of a Google Drive file or document.',
+    annotations: {
+      title: 'Copy File',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -688,6 +739,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'renameFile',
     description: 'Renames a file or folder in Google Drive.',
+    annotations: {
+      title: 'Rename File',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -727,6 +785,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'deleteFile',
     description: 'Permanently deletes a file or folder from Google Drive.',
+    annotations: {
+      title: 'Delete File',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -784,6 +849,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'createDocument',
     description: 'Creates a new Google Document.',
+    annotations: {
+      title: 'Create Document',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
@@ -862,6 +934,13 @@ export function registerDriveTools(
   server.addTool({
     name: 'createFromTemplate',
     description: 'Creates a new Google Document from an existing document template.',
+    annotations: {
+      title: 'Create From Template',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     parameters: z.object({
       account: z
         .string()
