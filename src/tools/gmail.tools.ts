@@ -201,124 +201,6 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
   });
 
-  // --- Send Gmail Message ---
-  server.addTool({
-    name: 'sendGmailMessage',
-    description: 'Send an email via Gmail. Supports plain text and HTML content.',
-    annotations: {
-      title: 'Send Gmail Message',
-      readOnlyHint: false,
-      destructiveHint: false,
-      idempotentHint: false,
-      openWorldHint: true,
-    },
-    parameters: z.object({
-      account: z.string().describe('Account name to use'),
-      to: z.string().describe('Recipient email address(es), comma-separated for multiple'),
-      subject: z.string().describe('Email subject'),
-      body: z.string().describe('Email body content'),
-      cc: z.string().optional().describe('CC recipients, comma-separated'),
-      bcc: z.string().optional().describe('BCC recipients, comma-separated'),
-      isHtml: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe('Whether the body is HTML (default: false for plain text)'),
-      replyToMessageId: z.string().optional().describe('Message ID to reply to (for threading)'),
-    }),
-    async execute(args, { log: _log }) {
-      try {
-        const gmail = await getGmailClient(args.account);
-
-        let threadId: string | undefined;
-        let inReplyTo: string | undefined;
-        let references: string | undefined;
-
-        // If replying to a message, get thread info and headers for proper threading
-        if (args.replyToMessageId) {
-          const originalMessage = await gmail.users.messages.get({
-            userId: 'me',
-            id: args.replyToMessageId,
-            format: 'metadata',
-            metadataHeaders: ['Message-ID', 'References'],
-          });
-
-          threadId = originalMessage.data.threadId ?? undefined;
-
-          // Get the Message-ID header for In-Reply-To and References
-          const headers = originalMessage.data.payload?.headers ?? [];
-          const messageIdHeader = headers.find(
-            (h) => h.name?.toLowerCase() === 'message-id'
-          )?.value;
-          const referencesHeader = headers.find(
-            (h) => h.name?.toLowerCase() === 'references'
-          )?.value;
-
-          if (messageIdHeader) {
-            inReplyTo = messageIdHeader;
-            // References should include the original References header (if any) plus the Message-ID
-            references = referencesHeader
-              ? `${referencesHeader} ${messageIdHeader}`
-              : messageIdHeader;
-          }
-        }
-
-        // Build the email
-        let emailContent = '';
-
-        emailContent += `To: ${args.to}\r\n`;
-        if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
-        if (args.bcc) emailContent += `Bcc: ${args.bcc}\r\n`;
-        emailContent += `Subject: ${args.subject}\r\n`;
-        if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
-        if (references) emailContent += `References: ${references}\r\n`;
-        emailContent += 'MIME-Version: 1.0\r\n';
-
-        if (args.isHtml) {
-          emailContent += 'Content-Type: text/html; charset=utf-8\r\n';
-        } else {
-          emailContent += 'Content-Type: text/plain; charset=utf-8\r\n';
-        }
-
-        emailContent += `\r\n${args.body}`;
-
-        // Base64 encode the email
-        const encodedEmail = Buffer.from(emailContent)
-          .toString('base64')
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_')
-          .replace(/=+$/, '');
-
-        const response = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: encodedEmail,
-            threadId: threadId,
-          },
-        });
-
-        const accountEmail = await getAccountEmail(args.account);
-        const link = response.data.id
-          ? getGmailMessageUrl(response.data.id, accountEmail)
-          : undefined;
-
-        let result = 'Successfully sent email.\n\n';
-        result += `To: ${args.to}\n`;
-        result += `Subject: ${args.subject}\n`;
-        result += `Message ID: ${response.data.id}\n`;
-        result += `Thread ID: ${response.data.threadId}\n`;
-        result += `Labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
-        if (link) {
-          result += `\nView sent message: ${link}`;
-        }
-
-        return result;
-      } catch (error: unknown) {
-        throw new Error(formatToolError('sendGmailMessage', error));
-      }
-    },
-  });
-
   // --- Search Gmail ---
   server.addTool({
     name: 'searchGmail',
@@ -457,13 +339,13 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
   });
 
-  // --- Modify Gmail Labels ---
+  // --- Add Gmail Label ---
   server.addTool({
-    name: 'modifyGmailLabels',
+    name: 'addGmailLabel',
     description:
-      'Add or remove labels from a Gmail message. Use to archive, mark as read/unread, star, etc.',
+      'Add a label to a Gmail message. Common labels: STARRED (star), IMPORTANT, INBOX. Use listGmailLabels to see all available labels.',
     annotations: {
-      title: 'Modify Gmail Labels',
+      title: 'Add Gmail Label',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -472,14 +354,9 @@ export function registerGmailTools(options: GmailToolOptions) {
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       messageId: z.string().describe('The message ID to modify'),
-      addLabelIds: z
-        .array(z.string())
-        .optional()
-        .describe('Label IDs to add (e.g., ["STARRED", "IMPORTANT"])'),
-      removeLabelIds: z
-        .array(z.string())
-        .optional()
-        .describe('Label IDs to remove (e.g., ["UNREAD", "INBOX"])'),
+      labelId: z
+        .string()
+        .describe('Label ID to add (e.g., "STARRED", "IMPORTANT", or a custom label ID)'),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -489,8 +366,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           userId: 'me',
           id: args.messageId,
           requestBody: {
-            addLabelIds: args.addLabelIds,
-            removeLabelIds: args.removeLabelIds,
+            addLabelIds: [args.labelId],
           },
         });
 
@@ -499,21 +375,66 @@ export function registerGmailTools(options: GmailToolOptions) {
           ? getGmailMessageUrl(response.data.id, accountEmail)
           : undefined;
 
-        let result = `Successfully modified labels for message ${args.messageId}.\n\n`;
-        if (args.addLabelIds?.length) {
-          result += `Added labels: ${args.addLabelIds.join(', ')}\n`;
-        }
-        if (args.removeLabelIds?.length) {
-          result += `Removed labels: ${args.removeLabelIds.join(', ')}\n`;
-        }
-        result += `\nCurrent labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
+        let result = `Successfully added label "${args.labelId}" to message ${args.messageId}.\n`;
+        result += `Current labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
         if (link) {
           result += `\nView message: ${link}`;
         }
 
         return result;
       } catch (error: unknown) {
-        throw new Error(formatToolError('modifyGmailLabels', error));
+        throw new Error(formatToolError('addGmailLabel', error));
+      }
+    },
+  });
+
+  // --- Remove Gmail Label ---
+  server.addTool({
+    name: 'removeGmailLabel',
+    description:
+      'Remove a label from a Gmail message. Common uses: remove UNREAD (mark as read), remove INBOX (archive), remove STARRED (unstar).',
+    annotations: {
+      title: 'Remove Gmail Label',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The message ID to modify'),
+      labelId: z
+        .string()
+        .describe(
+          'Label ID to remove (e.g., "UNREAD" to mark as read, "INBOX" to archive, "STARRED" to unstar)'
+        ),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.messages.modify({
+          userId: 'me',
+          id: args.messageId,
+          requestBody: {
+            removeLabelIds: [args.labelId],
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const link = response.data.id
+          ? getGmailMessageUrl(response.data.id, accountEmail)
+          : undefined;
+
+        let result = `Successfully removed label "${args.labelId}" from message ${args.messageId}.\n`;
+        result += `Current labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
+        if (link) {
+          result += `\nView message: ${link}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('removeGmailLabel', error));
       }
     },
   });
@@ -622,6 +543,283 @@ export function registerGmailTools(options: GmailToolOptions) {
         return result;
       } catch (error: unknown) {
         throw new Error(formatToolError('createGmailDraft', error));
+      }
+    },
+  });
+
+  // --- List Gmail Drafts ---
+  server.addTool({
+    name: 'listGmailDrafts',
+    description: 'List all draft emails in Gmail.',
+    annotations: {
+      title: 'List Gmail Drafts',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      maxResults: z
+        .number()
+        .optional()
+        .default(20)
+        .describe('Maximum number of drafts to return (default: 20)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.drafts.list({
+          userId: 'me',
+          maxResults: Math.min(args.maxResults || 20, 100),
+        });
+
+        const drafts = response.data.drafts ?? [];
+        const accountEmail = await getAccountEmail(args.account);
+
+        let result = `**Gmail Drafts (${drafts.length} found)**\n\n`;
+
+        if (drafts.length === 0) {
+          result += 'No drafts found.';
+          return result;
+        }
+
+        for (let i = 0; i < drafts.length; i++) {
+          const draft = drafts[i];
+          if (!draft.id) continue;
+
+          // Get draft details
+          const draftDetails = await gmail.users.drafts.get({
+            userId: 'me',
+            id: draft.id,
+            format: 'metadata',
+          });
+
+          const headers = draftDetails.data.message?.payload?.headers ?? [];
+          const getHeader = (name: string) =>
+            headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+
+          result += `**${i + 1}. ${getHeader('Subject') || '(no subject)'}**\n`;
+          result += `   Draft ID: ${draft.id}\n`;
+          result += `   To: ${getHeader('To') || '(no recipient)'}\n`;
+          if (draftDetails.data.message?.snippet) {
+            result += `   Preview: ${draftDetails.data.message.snippet}\n`;
+          }
+          result += '\n';
+        }
+
+        const draftsLink = getGmailDraftsUrl(accountEmail);
+        result += `View all drafts: ${draftsLink}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listGmailDrafts', error));
+      }
+    },
+  });
+
+  // --- Read Gmail Draft ---
+  server.addTool({
+    name: 'readGmailDraft',
+    description: 'Read the full content of a Gmail draft by its draft ID.',
+    annotations: {
+      title: 'Read Gmail Draft',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to read'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.drafts.get({
+          userId: 'me',
+          id: args.draftId,
+          format: 'full',
+        });
+
+        const message = response.data.message;
+        const headers = message?.payload?.headers ?? [];
+
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+
+        // Extract body
+        let body = '';
+        const extractBody = (part: MessagePart): string => {
+          if (part.body?.data) {
+            return Buffer.from(part.body.data, 'base64').toString('utf8');
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/plain') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/html') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              const result = extractBody(subpart);
+              if (result) return result;
+            }
+          }
+          return '';
+        };
+
+        if (message?.payload) {
+          body = extractBody(message.payload);
+        }
+
+        const accountEmail = await getAccountEmail(args.account);
+        const draftsLink = getGmailDraftsUrl(accountEmail);
+
+        let result = '**Draft Email**\n\n';
+        result += `Draft ID: ${response.data.id}\n`;
+        result += `Message ID: ${message?.id}\n`;
+        if (message?.threadId) {
+          result += `Thread ID: ${message.threadId}\n`;
+        }
+        result += '\n**Headers**\n';
+        result += `To: ${getHeader('To') || '(empty)'}\n`;
+        result += `Cc: ${getHeader('Cc') || '(empty)'}\n`;
+        result += `Subject: ${getHeader('Subject') || '(empty)'}\n`;
+        result += '\n**Body**\n';
+        result += body || '(empty)';
+        result += `\n\nView drafts: ${draftsLink}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('readGmailDraft', error));
+      }
+    },
+  });
+
+  // --- Update Gmail Draft ---
+  server.addTool({
+    name: 'updateGmailDraft',
+    description:
+      'Update an existing Gmail draft. You can update any combination of to, cc, subject, or body. Fields not provided will keep their current values.',
+    annotations: {
+      title: 'Update Gmail Draft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to update'),
+      to: z.string().optional().describe('New recipient(s) - if not provided, keeps current'),
+      cc: z.string().optional().describe('New CC recipient(s) - if not provided, keeps current'),
+      subject: z.string().optional().describe('New subject - if not provided, keeps current'),
+      body: z.string().optional().describe('New body content - if not provided, keeps current'),
+      isHtml: z
+        .boolean()
+        .optional()
+        .describe('Whether the body is HTML (default: false for plain text)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        // First, get the current draft content
+        const currentDraft = await gmail.users.drafts.get({
+          userId: 'me',
+          id: args.draftId,
+          format: 'full',
+        });
+
+        const currentMessage = currentDraft.data.message;
+        const currentHeaders = currentMessage?.payload?.headers ?? [];
+
+        const getCurrentHeader = (name: string) =>
+          currentHeaders.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        // Extract current body
+        let currentBody = '';
+        const extractBody = (part: MessagePart): string => {
+          if (part.body?.data) {
+            return Buffer.from(part.body.data, 'base64').toString('utf8');
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/plain') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/html') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              const result = extractBody(subpart);
+              if (result) return result;
+            }
+          }
+          return '';
+        };
+
+        if (currentMessage?.payload) {
+          currentBody = extractBody(currentMessage.payload);
+        }
+
+        // Merge with updates (use new values if provided, otherwise keep current)
+        const newTo = args.to ?? getCurrentHeader('To');
+        const newCc = args.cc ?? getCurrentHeader('Cc');
+        const newSubject = args.subject ?? getCurrentHeader('Subject');
+        const newBody = args.body ?? currentBody;
+        const isHtml = args.isHtml ?? false;
+
+        // Build the updated email
+        let emailContent = '';
+        emailContent += `To: ${newTo}\r\n`;
+        if (newCc) emailContent += `Cc: ${newCc}\r\n`;
+        emailContent += `Subject: ${newSubject}\r\n`;
+        emailContent += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+        emailContent += `\r\n${newBody}`;
+
+        const encodedEmail = Buffer.from(emailContent)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        // Update the draft
+        const response = await gmail.users.drafts.update({
+          userId: 'me',
+          id: args.draftId,
+          requestBody: {
+            message: {
+              raw: encodedEmail,
+              threadId: currentMessage?.threadId,
+            },
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const draftsLink = getGmailDraftsUrl(accountEmail);
+
+        let result = 'Successfully updated draft.\n\n';
+        result += `Draft ID: ${response.data.id}\n`;
+        result += `To: ${newTo}\n`;
+        if (newCc) result += `Cc: ${newCc}\n`;
+        result += `Subject: ${newSubject}\n`;
+        result += '\n**Updated fields:**\n';
+        if (args.to !== undefined) result += '- To\n';
+        if (args.cc !== undefined) result += '- Cc\n';
+        if (args.subject !== undefined) result += '- Subject\n';
+        if (args.body !== undefined) result += '- Body\n';
+        result += `\nView drafts: ${draftsLink}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('updateGmailDraft', error));
       }
     },
   });

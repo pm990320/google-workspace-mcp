@@ -1,6 +1,6 @@
 # Google Workspace MCP Server
 
-FastMCP server with 65+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms.
+FastMCP server with 71+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms.
 
 ## Multi-Account Support
 
@@ -39,7 +39,7 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Comments | 6 | `listComments`, `getComment`, `addComment`, `replyToComment`, `resolveComment`, `deleteComment` |
 | Sheets | 8 | `readSpreadsheet`, `writeSpreadsheet`, `appendSpreadsheetRows`, `clearSpreadsheetRange`, `createSpreadsheet`, `listGoogleSheets` |
 | Drive | 13 | `listGoogleDocs`, `searchGoogleDocs`, `getDocumentInfo`, `createFolder`, `moveFile`, `copyFile`, `createDocument` |
-| Gmail | 8 | `listGmailMessages`, `readGmailMessage`, `sendGmailMessage`, `searchGmail`, `listGmailLabels`, `modifyGmailLabels`, `createGmailDraft`, `deleteGmailMessage` |
+| Gmail | 13 | `listGmailMessages`, `readGmailMessage`, `searchGmail`, `listGmailLabels`, `addGmailLabel`, `removeGmailLabel`, `createGmailDraft`, `listGmailDrafts`, `readGmailDraft`, `updateGmailDraft`, `sendGmailDraft`, `deleteGmailDraft`, `deleteGmailMessage` |
 | Calendar | 6 | `listCalendars`, `listCalendarEvents`, `getCalendarEvent`, `createCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent` |
 | Slides | 5 | `listPresentations`, `readPresentation`, `createPresentation`, `addSlide`, `addTextToSlide` |
 | Forms | 5 | `listForms`, `readForm`, `getFormResponses`, `createForm`, `addFormQuestion` |
@@ -81,6 +81,7 @@ The server requires these Google OAuth scopes:
 ## Safety Features
 
 - **No permanent deletion:** The `deleteFile` tool always moves files to trash rather than permanently deleting them. Files can be restored from trash within 30 days. This prevents accidental data loss.
+- **Draft-only email sending:** Emails cannot be sent directly. The workflow is: `createGmailDraft` → user reviews in Gmail → `sendGmailDraft`. This ensures a human always reviews emails before sending, preventing accidental or AI-generated emails from being sent without approval.
 
 ## URL Handling
 

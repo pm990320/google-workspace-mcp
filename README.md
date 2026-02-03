@@ -3,14 +3,14 @@
 Connect Claude Desktop (or other MCP clients) to your entire Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms!
 
 > 🔥 **Check out [15 powerful tasks](SAMPLE_TASKS.md) you can accomplish with this enhanced server!**
-> 📧 **NEW:** Full Gmail support (send, read, search, labels, drafts)
+> 📧 **NEW:** Full Gmail support with safe draft-based email workflow
 > 📅 **NEW:** Google Calendar integration (events, calendars, CRUD)
 > 📽️ **NEW:** Google Slides support (presentations, slides, text)
 > 📝 **NEW:** Google Forms support (create forms, questions, responses)
 > 👥 **NEW:** Multi-account support (connect multiple Google accounts)
 > 🔧 **NEW:** CLI for easy setup and account management
 
-This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **65+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
+This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **71+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
 
 **Upgrading from [a-bonus/google-docs-mcp](https://github.com/a-bonus/google-docs-mcp)?** See [UPGRADE.md](UPGRADE.md) for migration instructions.
 
@@ -69,11 +69,16 @@ This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp
 
 - **List Messages:** View inbox messages with `listGmailMessages` (with optional query filters)
 - **Read Messages:** Get full message content with `readGmailMessage`
-- **Send Email:** Compose and send emails with `sendGmailMessage` (supports HTML, CC, BCC)
 - **Search:** Find emails with `searchGmail` using Gmail query syntax
-- **Labels:** List labels with `listGmailLabels`, modify with `modifyGmailLabels`
-- **Drafts:** Create email drafts with `createGmailDraft`
-- **Delete:** Remove messages with `deleteGmailMessage`
+- **Labels:** List labels with `listGmailLabels`, add with `addGmailLabel`, remove with `removeGmailLabel`
+- **Drafts (Safe Email Workflow):**
+  - Create: `createGmailDraft` (supports threading via `replyToMessageId`)
+  - List: `listGmailDrafts`
+  - Read: `readGmailDraft`
+  - Edit: `updateGmailDraft` (update to, cc, subject, or body)
+  - Send: `sendGmailDraft` (sends after human review)
+  - Delete: `deleteGmailDraft`
+- **Delete:** Move messages to trash with `deleteGmailMessage`
 
 ### 🆕 Google Calendar
 
