@@ -326,3 +326,51 @@ export class NotImplementedError extends Error {
     this.name = 'NotImplementedError';
   }
 }
+
+// --- Tool Registration Options Types ---
+
+/** Common options shared by all tool registration functions */
+export interface BaseToolOptions {
+  server: FastMCPServer;
+  getAccountEmail: (accountName: string) => Promise<string>;
+}
+
+/** Options for registering Docs tools */
+export interface DocsToolOptions extends BaseToolOptions {
+  getDocsClient: (accountName: string) => Promise<DocsClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
+
+/** Options for registering Drive tools */
+export interface DriveToolOptions extends BaseToolOptions {
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+  getDocsClient: (accountName: string) => Promise<DocsClient>;
+}
+
+/** Options for registering Sheets tools */
+export interface SheetsToolOptions extends BaseToolOptions {
+  getSheetsClient: (accountName: string) => Promise<SheetsClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
+
+/** Options for registering Gmail tools */
+export interface GmailToolOptions extends BaseToolOptions {
+  getGmailClient: (accountName: string) => Promise<GmailClient>;
+}
+
+/** Options for registering Calendar tools */
+export interface CalendarToolOptions extends BaseToolOptions {
+  getCalendarClient: (accountName: string) => Promise<CalendarClient>;
+}
+
+/** Options for registering Slides tools */
+export interface SlidesToolOptions extends BaseToolOptions {
+  getSlidesClient: (accountName: string) => Promise<SlidesClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
+
+/** Options for registering Forms tools */
+export interface FormsToolOptions extends BaseToolOptions {
+  getFormsClient: (accountName: string) => Promise<FormsClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
