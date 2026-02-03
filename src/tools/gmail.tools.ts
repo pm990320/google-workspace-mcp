@@ -186,8 +186,9 @@ export function registerGmailTools(options: GmailToolOptions) {
           result += `**Attachments (${attachments.length})**\n`;
           attachments.forEach((att, i) => {
             result += `${i + 1}. ${att.filename} (${att.mimeType}, ${att.size} bytes)\n`;
+            result += `   Attachment ID: ${att.attachmentId}\n`;
           });
-          result += '\n';
+          result += '\nUse getGmailAttachment with the message ID and attachment ID to download attachments.\n';
         }
 
         if (link) {
@@ -343,7 +344,7 @@ export function registerGmailTools(options: GmailToolOptions) {
   server.addTool({
     name: 'addGmailLabel',
     description:
-      'Add a label to a Gmail message. Common labels: STARRED (star), IMPORTANT, INBOX. Use listGmailLabels to see all available labels.',
+      'Add a label to a Gmail message. Common labels: STARRED (star), IMPORTANT, INBOX. Use listGmailLabels to see all available labels. WARNING: Draft message IDs are ephemeral and may change after draft modifications (e.g., adding/removing attachments). If labeling a draft, perform label operations BEFORE modifying draft attachments, or re-fetch the draft to get the current message ID.',
     annotations: {
       title: 'Add Gmail Label',
       readOnlyHint: false,
@@ -392,7 +393,7 @@ export function registerGmailTools(options: GmailToolOptions) {
   server.addTool({
     name: 'removeGmailLabel',
     description:
-      'Remove a label from a Gmail message. Common uses: remove UNREAD (mark as read), remove INBOX (archive), remove STARRED (unstar).',
+      'Remove a label from a Gmail message. Common uses: remove UNREAD (mark as read), remove INBOX (archive), remove STARRED (unstar). WARNING: Draft message IDs are ephemeral and may change after draft modifications (e.g., adding/removing attachments). If removing labels from a draft, perform label operations BEFORE modifying draft attachments, or re-fetch the draft to get the current message ID.',
     annotations: {
       title: 'Remove Gmail Label',
       readOnlyHint: false,

@@ -287,7 +287,8 @@ export function registerFormsTools(options: FormsToolOptions) {
   // --- Add Question to Form ---
   server.addTool({
     name: 'addFormQuestion',
-    description: 'Add a question to a Google Form.',
+    description:
+      "Add a question to a Google Form. Question types must be lowercase: 'short_text' (single line text), 'paragraph' (multi-line text), 'multiple_choice' (radio buttons, single selection), 'checkboxes' (multiple selections), 'dropdown' (dropdown menu), 'scale' (linear scale). Example: questionType: 'multiple_choice' with options: ['Yes', 'No', 'Maybe'].",
     annotations: {
       title: 'Add Form Question',
       readOnlyHint: false,
@@ -301,7 +302,9 @@ export function registerFormsTools(options: FormsToolOptions) {
       title: z.string().describe('Question title/text'),
       questionType: z
         .enum(['short_text', 'paragraph', 'multiple_choice', 'checkboxes', 'dropdown', 'scale'])
-        .describe('Type of question'),
+        .describe(
+          "Type of question. Must be lowercase: 'short_text', 'paragraph', 'multiple_choice', 'checkboxes', 'dropdown', or 'scale'. NOT uppercase like 'SHORT_ANSWER'."
+        ),
       required: z.boolean().optional().default(false).describe('Whether the question is required'),
       options: z
         .array(z.string())

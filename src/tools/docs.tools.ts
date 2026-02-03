@@ -1692,7 +1692,7 @@ export function registerDocsTools(options: DocsToolOptions) {
   server.addTool({
     name: 'resolveComment',
     description:
-      'Marks a comment as resolved. NOTE: Due to Google API limitations, the Drive API does not support resolving comments on Google Docs files. This operation will attempt to update the comment but the resolved status may not persist in the UI. Comments can be resolved manually in the Google Docs interface.',
+      'Marks a comment as resolved. IMPORTANT LIMITATION: The Google Drive API does not fully support resolving comments on Google Docs files. While this tool will attempt to set the resolved status, it typically does NOT persist in the Google Docs UI. This is a known Google API limitation, not a bug in this tool. To reliably resolve comments, users should resolve them manually in the Google Docs interface. This tool is provided for completeness but has limited practical utility for Docs files.',
     annotations: {
       title: 'Resolve Comment',
       readOnlyHint: false,
