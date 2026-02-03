@@ -2,7 +2,11 @@
   "name": "google-workspace-mcp",
   "version": "2.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/cli.js",
+  "bin": {
+    "google-workspace-mcp": "dist/cli.js",
+    "gwmcp": "dist/cli.js"
+  },
   "scripts": {
     "test": "node --test 'tests/**/*.test.js'",
     "build": "tsc",
@@ -30,6 +34,7 @@
   "license": "MIT",
   "description": "MCP server for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms",
   "dependencies": {
+    "commander": "^14.0.3",
     "fastmcp": "^3.24.0",
     "google-auth-library": "^9.15.1",
     "googleapis": "^148.0.0",

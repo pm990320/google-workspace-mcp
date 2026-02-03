@@ -30,25 +30,37 @@ export function registerGmailTools(
         ),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      const response = await gmail.users.messages.list({
-        userId: 'me',
-        maxResults: Math.min(args.maxResults || 10, 500),
-        labelIds: args.labelIds,
-        q: args.query,
-      });
+        const response = await gmail.users.messages.list({
+          userId: 'me',
+          maxResults: Math.min(args.maxResults || 10, 500),
+          labelIds: args.labelIds,
+          q: args.query,
+        });
 
-      const messages = response.data.messages || [];
-      return JSON.stringify(
-        {
-          totalMessages: response.data.resultSizeEstimate,
-          messages: messages.map((m) => ({ id: m.id, threadId: m.threadId })),
-          nextPageToken: response.data.nextPageToken,
-        },
-        null,
-        2
-      );
+        const messages = response.data.messages || [];
+        return JSON.stringify(
+          {
+            totalMessages: response.data.resultSizeEstimate,
+            messages: messages.map((m) => ({ id: m.id, threadId: m.threadId })),
+            nextPageToken: response.data.nextPageToken,
+          },
+          null,
+          2
+        );
+      } catch (error: any) {
+        const errorDetails = {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+          errors: error.errors,
+          response: error.response?.data,
+        };
+        console.error('[listGmailMessages] Error details:', JSON.stringify(errorDetails, null, 2));
+        throw new Error(`Gmail API error: ${error.message}. Code: ${error.code}. Details: ${JSON.stringify(error.errors || error.response?.data || 'No additional details')}`);
+      }
     },
   });
 

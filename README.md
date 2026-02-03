@@ -8,6 +8,7 @@ Connect Claude Desktop (or other MCP clients) to your entire Google Workspace: D
 > 📽️ **NEW:** Google Slides support (presentations, slides, text)
 > 📝 **NEW:** Google Forms support (create forms, questions, responses)
 > 👥 **NEW:** Multi-account support (connect multiple Google accounts)
+> 🔧 **NEW:** CLI for easy setup and account management
 
 This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **65+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
 
@@ -279,32 +280,93 @@ The server is written in TypeScript (`.ts`), but we need to compile it into Java
 
 ### Step 5: First Run & Google Authorization (One Time Only)
 
-Now you need to run the server once manually to grant it permission to access your Google account data. This will create a `token.json` file that saves your permission grant.
+Now you need to add your first Google account. The server includes a CLI to make this easy.
+
+#### Option A: Using the CLI (Recommended)
+
+1.  **Check your setup:**
+    ```bash
+    npx google-workspace-mcp setup
+    ```
+    This will verify your credentials file is in place and show you the next steps.
+
+2.  **Add your first Google account:**
+    ```bash
+    npx google-workspace-mcp accounts add personal
+    ```
+    Replace `personal` with any name you want (e.g., `work`, `main`, etc.)
+
+3.  **Authorize in Browser:**
+    - The CLI will display an authorization URL
+    - Open it in your browser and sign in with your Google account
+    - After authorizing, the account is automatically added
+
+4.  **Verify the account was added:**
+    ```bash
+    npx google-workspace-mcp accounts list
+    ```
+
+5.  **Check overall status:**
+    ```bash
+    npx google-workspace-mcp status
+    ```
+
+#### CLI Commands Reference
+
+```bash
+# Show help
+npx google-workspace-mcp --help
+
+# Start the MCP server (for Claude Desktop)
+npx google-workspace-mcp serve
+
+# Interactive setup wizard
+npx google-workspace-mcp setup
+
+# Account management
+npx google-workspace-mcp accounts list                  # List all accounts
+npx google-workspace-mcp accounts add <name>            # Add a new account (opens browser automatically)
+npx google-workspace-mcp accounts add <name> --no-open  # Add account without auto-opening browser
+npx google-workspace-mcp accounts add <name> -c /path/to/credentials.json  # Add with custom credentials
+npx google-workspace-mcp accounts remove <name>         # Remove an account
+npx google-workspace-mcp accounts test-permissions      # Test API permissions for all accounts
+npx google-workspace-mcp accounts test-permissions <name>  # Test permissions for a specific account
+
+# Configuration
+npx google-workspace-mcp config path                # Show config directory path
+npx google-workspace-mcp config show                # Show current configuration
+
+# Server status
+npx google-workspace-mcp status                     # Check if server is ready
+```
+
+#### Testing API Permissions
+
+After adding accounts, you can verify that all Google API permissions are correctly configured:
+
+```bash
+# Test all accounts
+npx google-workspace-mcp accounts test-permissions
+
+# Test a specific account
+npx google-workspace-mcp accounts test-permissions personal
+```
+
+This command tests access to all 7 Google services (Drive, Docs, Sheets, Gmail, Calendar, Slides, Forms) and reports which permissions are working and which need attention. Use this to diagnose permission issues after adding an account.
+
+#### Option B: Manual Authorization (Legacy)
+
+If you prefer the old method:
 
 1.  In your terminal, run the _compiled_ server using `node`:
     ```bash
     node ./dist/server.js
     ```
-2.  **Watch the Terminal:** The script will print:
-    - Status messages (like "Attempting to authorize...").
-    - An "Authorize this app by visiting this url:" message followed by a long `https://accounts.google.com/...` URL.
-3.  **Authorize in Browser:**
-    - Copy the entire long URL from the terminal.
-    - Paste the URL into your web browser and press Enter.
-    - Log in with the **same Google account** you added as a Test User in Step 1.4.
-      - Google will show a screen asking for permission for your app ("Claude Docs MCP Access" or similar) to access Google Docs, Sheets, and Drive. Review and click "**Allow**" or "**Grant**".
-4.  **Get the Authorization Code:**
-    - After clicking Allow, your browser will likely try to redirect to `http://localhost` and show a **"This site can't be reached" error**. **THIS IS NORMAL!**
-    - Look **carefully** at the URL in your browser's address bar. It will look like `http://localhost/?code=4/0Axxxxxxxxxxxxxx&scope=...`
-    - Copy the long string of characters **between `code=` and the `&scope` part**. This is your single-use authorization code.
-5.  **Paste Code into Terminal:** Go back to your terminal where the script is waiting ("Enter the code from that page here:"). Paste the code you just copied.
-6.  **Press Enter.**
-7.  **Success!** The script should print:
-    - "Authentication successful!"
-    - "Token stored to .../token.json"
-    - It will then finish starting and likely print "Awaiting MCP client connection via stdio..." or similar, and then exit (or you can press `Ctrl+C` to stop it).
-8.  ✅ **Check:** You should now see a new file named `token.json` in your `mcp-googledocs-server` folder.
-9.  ⚠️ **SECURITY WARNING:** This `token.json` file contains the key that allows the server to access your Google account _without_ asking again. Protect it like a password. **Do not commit it to GitHub.** The included `.gitignore` file should prevent this automatically.
+2.  **Watch the Terminal:** The script will print status messages and an authorization URL.
+3.  **Authorize in Browser:** Copy the URL, open it in your browser, and sign in.
+4.  **Complete the OAuth flow** as prompted.
+
+After authorization, a token file is saved and you won't need to authorize again unless you remove the account.
 
 ### Step 5b: Multi-Account Setup (Optional)
 
@@ -313,30 +375,32 @@ This server supports connecting multiple Google accounts simultaneously. This is
 **How It Works:**
 - Accounts are stored in `~/.google-mcp/` with individual token files
 - Each tool requires an `account` parameter to specify which account to use
-- Use `listAccounts` to see all connected accounts
-- Use `addAccount` to add new accounts, `removeAccount` to remove them
+- Use the CLI or MCP tools to manage accounts
 
-**Initial Setup:**
+**Adding Multiple Accounts with CLI (Recommended):**
 
-1. **Move your credentials file:**
-   ```bash
-   mkdir -p ~/.google-mcp
-   cp credentials.json ~/.google-mcp/credentials.json
-   ```
+```bash
+# Add your personal account
+npx google-workspace-mcp accounts add personal
 
-2. **Add your first account** using Claude Desktop or another MCP client:
-   - Call the `addAccount` tool with a name for the account (e.g., "work" or "personal")
-   - The tool returns an authorization URL - open it in your browser
-   - Sign in with the Google account you want to add
-   - Authorize the app when prompted
-   - The account is now available for use
+# Add your work account
+npx google-workspace-mcp accounts add work
 
-3. **Add additional accounts** by repeating step 2 with different account names
+# List all accounts
+npx google-workspace-mcp accounts list
+```
 
-**Example Usage:**
+**Adding Accounts via MCP Tools (Alternative):**
+
+If you prefer to add accounts through Claude or another MCP client:
+- Call the `addAccount` tool with a name for the account (e.g., "work" or "personal")
+- The tool returns an authorization URL - open it in your browser
+- Sign in with the Google account you want to add
+- Authorize the app when prompted
+
+**Example Usage in Claude:**
 ```
 "List all my connected Google accounts using listAccounts"
-"Add a new account named 'personal' using addAccount"
 "Read document YOUR_DOC_ID using account 'work'"
 "List my Google Docs in account 'personal'"
 ```

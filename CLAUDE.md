@@ -79,15 +79,35 @@ The server requires these Google OAuth scopes:
 - **Tabs:** Optional `tabId` parameter (defaults to first tab)
 - **Date/Time:** ISO 8601 format for Calendar events (e.g., "2024-01-15T10:00:00-05:00")
 
+## CLI Commands
+
+```bash
+npx google-workspace-mcp serve       # Start the MCP server
+npx google-workspace-mcp setup       # Interactive setup wizard
+npx google-workspace-mcp accounts list    # List all accounts
+npx google-workspace-mcp accounts add <name>   # Add a new account (auto-opens browser)
+npx google-workspace-mcp accounts add <name> --no-open  # Add without auto-opening browser
+npx google-workspace-mcp accounts remove <name>  # Remove an account
+npx google-workspace-mcp accounts test-permissions  # Test API permissions for all accounts
+npx google-workspace-mcp accounts test-permissions <name>  # Test a specific account
+npx google-workspace-mcp status      # Check server readiness
+npx google-workspace-mcp config show # Show configuration
+```
+
 ## Source Files (for implementation details)
 
 | File | Contains |
 |------|----------|
+| `src/cli.ts` | CLI entrypoint with Commander.js commands |
+| `src/server.ts` | MCP server setup and tool registration |
 | `src/accounts.ts` | Multi-account management, OAuth flow, token storage |
 | `src/types.ts` | Zod schemas, hex color validation, style parameter definitions |
 | `src/googleDocsApiHelpers.ts` | `findTextRange`, `executeBatchUpdate`, style request builders |
 | `src/googleSheetsApiHelpers.ts` | A1 notation parsing, range operations |
-| `src/server.ts` | Docs, Sheets, Drive tool definitions, core server setup |
+| `src/tools/docs.tools.ts` | Google Docs tool definitions |
+| `src/tools/drive.tools.ts` | Google Drive tool definitions |
+| `src/tools/sheets.tools.ts` | Google Sheets tool definitions |
+| `src/tools/accounts.tools.ts` | Account management tool definitions |
 | `src/tools/gmail.tools.ts` | Gmail tool definitions |
 | `src/tools/calendar.tools.ts` | Calendar tool definitions |
 | `src/tools/slides.tools.ts` | Slides tool definitions |
