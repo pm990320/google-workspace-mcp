@@ -64,14 +64,19 @@ export function registerDriveTools(options: DriveToolOptions) {
           queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
         }
 
-        const response = await drive.files.list({
-          q: queryString,
-          pageSize: args.maxResults,
-          orderBy: args.orderBy
+        // Don't use orderBy when query contains fullText search (Google Drive API limitation)
+        const orderBy = args.query
+          ? undefined
+          : args.orderBy
             ? args.orderBy === 'name'
               ? 'name'
               : args.orderBy
-            : 'modifiedTime',
+            : 'modifiedTime';
+
+        const response = await drive.files.list({
+          q: queryString,
+          pageSize: args.maxResults,
+          orderBy,
           fields:
             'files(id,name,modifiedTime,createdTime,size,webViewLink,owners(displayName,emailAddress))',
         });
@@ -167,10 +172,14 @@ export function registerDriveTools(options: DriveToolOptions) {
           queryString += ` and modifiedTime > '${args.modifiedAfter}'`;
         }
 
+        // Don't use orderBy when query contains fullText search (Google Drive API limitation)
+        // Only 'name' search doesn't use fullText
+        const orderBy = args.searchIn === 'name' ? 'modifiedTime desc' : undefined;
+
         const response = await drive.files.list({
           q: queryString,
           pageSize: args.maxResults,
-          orderBy: 'modifiedTime desc',
+          orderBy,
           fields: 'files(id,name,modifiedTime,createdTime,webViewLink,owners(displayName),parents)',
         });
 

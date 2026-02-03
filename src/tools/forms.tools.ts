@@ -43,10 +43,19 @@ export function registerFormsTools(options: FormsToolOptions) {
         queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
       }
 
+      // Don't use orderBy when query contains fullText search (Google Drive API limitation)
+      const orderBy = args.query
+        ? undefined
+        : args.orderBy
+          ? args.orderBy === 'name'
+            ? 'name'
+            : args.orderBy
+          : 'modifiedTime';
+
       const response = await drive.files.list({
         q: queryString,
         pageSize: args.maxResults,
-        orderBy: args.orderBy ? (args.orderBy === 'name' ? 'name' : args.orderBy) : 'modifiedTime',
+        orderBy,
         fields: 'files(id, name, createdTime, modifiedTime, owners, webViewLink)',
       });
 
