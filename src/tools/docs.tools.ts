@@ -1,7 +1,7 @@
 // docs.tools.ts - Google Docs tool definitions
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { type docs_v1, type drive_v3 } from 'googleapis';
+import { type docs_v1 } from 'googleapis';
 import {
   AccountDocumentParameters,
   OptionalRangeParameters,
@@ -13,7 +13,7 @@ import {
   ApplyParagraphStyleToolParameters,
   type ApplyParagraphStyleToolArgs,
   NotImplementedError,
-  type FastMCPServer,
+  type DocsToolOptions,
   type StructuralElement,
   type ParagraphElement,
   type Paragraph,
@@ -27,6 +27,7 @@ import {
 } from '../types.js';
 import * as GDocsHelpers from '../googleDocsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
+import { getDocsUrl } from '../urlHelpers.js';
 
 /**
  * Converts Google Docs JSON structure to Markdown format
@@ -170,11 +171,8 @@ function convertTableToMarkdown(table: DocsTable): string {
   return markdown + '\n';
 }
 
-export function registerDocsTools(
-  server: FastMCPServer,
-  getDocsClient: (accountName: string) => Promise<docs_v1.Docs>,
-  getDriveClient: (accountName: string) => Promise<drive_v3.Drive>
-) {
+export function registerDocsTools(options: DocsToolOptions) {
+  const { server, getDocsClient, getDriveClient, getAccountEmail } = options;
   // --- readGoogleDoc ---
   server.addTool({
     name: 'readGoogleDoc',
@@ -208,6 +206,7 @@ export function registerDocsTools(
     }),
     execute: async (args, { log }) => {
       const docs = await getDocsClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(
         `Reading Google Doc: ${args.documentId}, Format: ${args.format}${args.tabId ? `, Tab: ${args.tabId}` : ''}`
       );
@@ -320,7 +319,8 @@ export function registerDocsTools(
         }
 
         // Return full content
-        const fullResponse = `Content (${totalLength} characters):\n---\n${textContent}`;
+        const docLink = getDocsUrl(args.documentId, email);
+        const fullResponse = `Content (${totalLength} characters):\n---\n${textContent}\n\n---\nView document: ${docLink}`;
         const responseLength = fullResponse.length;
         log.info(
           `Returning full content: ${responseLength} characters in response (${totalLength} content + ${responseLength - totalLength} metadata)`
@@ -467,8 +467,10 @@ export function registerDocsTools(
         const charsRemoved = args.oldText.length;
         const charsAdded = args.newText.length;
         const netChange = charsAdded - charsRemoved;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
 
-        return `Successfully edited document. Replaced ${charsRemoved} characters with ${charsAdded} characters (net change: ${netChange >= 0 ? '+' : ''}${netChange}).`;
+        return `Successfully edited document. Replaced ${charsRemoved} characters with ${charsAdded} characters (net change: ${netChange >= 0 ? '+' : ''}${netChange}).\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error editing doc ${args.documentId}: ${message}`);
@@ -674,10 +676,12 @@ export function registerDocsTools(
         const request: docs_v1.Schema$Request = { insertText: { location, text: textToInsert } };
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [request]);
 
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
         log.info(
           `Successfully appended to doc: ${args.documentId}${args.tabId ? ` (tab: ${args.tabId})` : ''}`
         );
-        return `Successfully appended text to ${args.tabId ? `tab ${args.tabId} in ` : ''}document ${args.documentId}.`;
+        return `Successfully appended text to ${args.tabId ? `tab ${args.tabId} in ` : ''}document.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error appending to doc ${args.documentId}: ${message}`);
@@ -746,7 +750,9 @@ export function registerDocsTools(
           // Use existing helper for backward compatibility
           await GDocsHelpers.insertText(docs, args.documentId, args.textToInsert, args.index);
         }
-        return `Successfully inserted text at index ${args.index}${args.tabId ? ` in tab ${args.tabId}` : ''}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully inserted text at index ${args.index}${args.tabId ? ` in tab ${args.tabId}` : ''}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error inserting text in doc ${args.documentId}: ${message}`);
@@ -824,7 +830,9 @@ export function registerDocsTools(
           deleteContentRange: { range },
         };
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [request]);
-        return `Successfully deleted content in range ${args.startIndex}-${args.endIndex}${args.tabId ? ` in tab ${args.tabId}` : ''}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully deleted content in range ${args.startIndex}-${args.endIndex}${args.tabId ? ` in tab ${args.tabId}` : ''}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error deleting range in doc ${args.documentId}: ${message}`);
@@ -838,7 +846,7 @@ export function registerDocsTools(
   server.addTool({
     name: 'applyTextStyle',
     description:
-      'Applies character-level formatting (bold, color, font, etc.) to a specific range or found text.',
+      'Applies character-level formatting (bold, color, font, etc.) to a specific range or found text. Target must be specified as EITHER {startIndex, endIndex} for index-based targeting OR {textToFind, matchInstance?} for text search. Examples: target: {startIndex: 1, endIndex: 10} OR target: {textToFind: "Hello", matchInstance: 1}',
     annotations: {
       title: 'Apply Text Style',
       readOnlyHint: false,
@@ -901,7 +909,9 @@ export function registerDocsTools(
         }
 
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
-        return `Successfully applied text style (${requestInfo.fields.join(', ')}) to range ${startIndex}-${endIndex}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully applied text style (${requestInfo.fields.join(', ')}) to range ${startIndex}-${endIndex}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error applying text style in doc ${args.documentId}: ${message}`);
@@ -916,7 +926,7 @@ export function registerDocsTools(
   server.addTool({
     name: 'applyParagraphStyle',
     description:
-      'Applies paragraph-level formatting (alignment, spacing, named styles like Heading 1) to the paragraph(s) containing specific text, an index, or a range.',
+      'Applies paragraph-level formatting (alignment, spacing, named styles like Heading 1) to paragraph(s). Target must be specified as EITHER {startIndex, endIndex} for a range, {indexWithinParagraph} to style the paragraph containing that index, OR {textToFind, matchInstance?} to style the paragraph containing that text. Examples: target: {startIndex: 1, endIndex: 50} OR target: {indexWithinParagraph: 25} OR target: {textToFind: "Introduction", matchInstance: 1}',
     annotations: {
       title: 'Apply Paragraph Style',
       readOnlyHint: false,
@@ -1022,8 +1032,10 @@ export function registerDocsTools(
 
         log.info(`Applying styles: ${requestInfo.fields.join(', ')}`);
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
 
-        return `Successfully applied paragraph styles (${requestInfo.fields.join(', ')}) to the paragraph.`;
+        return `Successfully applied paragraph styles (${requestInfo.fields.join(', ')}) to the paragraph.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         // Detailed error logging
@@ -1065,8 +1077,10 @@ export function registerDocsTools(
       );
       try {
         await GDocsHelpers.createTable(docs, args.documentId, args.rows, args.columns, args.index);
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
         // The API response contains info about the created table, but might be too complex to return here.
-        return `Successfully inserted a ${args.rows}x${args.columns} table at index ${args.index}.`;
+        return `Successfully inserted a ${args.rows}x${args.columns} table at index ${args.index}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error inserting table in doc ${args.documentId}: ${message}`);
@@ -1171,7 +1185,9 @@ export function registerDocsTools(
           }
         }
 
-        return `Successfully edited cell (${args.rowIndex}, ${args.columnIndex}) in table at index ${args.tableStartIndex}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully edited cell (${args.rowIndex}, ${args.columnIndex}) in table at index ${args.tableStartIndex}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error editing table cell in doc ${args.documentId}: ${message}`);
@@ -1209,7 +1225,9 @@ export function registerDocsTools(
           },
         };
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [request]);
-        return `Successfully inserted page break at index ${args.index}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully inserted page break at index ${args.index}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error inserting page break in doc ${args.documentId}: ${message}`);
@@ -1264,7 +1282,9 @@ export function registerDocsTools(
           sizeInfo = ` with size ${args.width}x${args.height}pt`;
         }
 
-        return `Successfully inserted image from URL at index ${args.index}${sizeInfo}.`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully inserted image from URL at index ${args.index}${sizeInfo}.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error inserting image in doc ${args.documentId}: ${message}`);
@@ -1358,7 +1378,9 @@ export function registerDocsTools(
           sizeInfo = ` with size ${args.width}x${args.height}pt`;
         }
 
-        return `Successfully uploaded image to Drive and inserted it at index ${args.index}${sizeInfo}.\nImage URL: ${imageUrl}`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully uploaded image to Drive and inserted it at index ${args.index}${sizeInfo}.\nImage URL: ${imageUrl}\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error uploading/inserting local image in doc ${args.documentId}: ${message}`);
@@ -1398,7 +1420,9 @@ export function registerDocsTools(
           args.range?.startIndex,
           args.range?.endIndex
         );
-        return 'Attempted to fix list formatting. Please review the document for accuracy.';
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Attempted to fix list formatting. Please review the document for accuracy.\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error fixing list formatting in doc ${args.documentId}: ${message}`);
@@ -1804,7 +1828,7 @@ export function registerDocsTools(
         const body = document.body;
 
         if (!body?.content) {
-          return JSON.stringify({ elements: [], message: 'Document has no content' }, null, 2);
+          return 'Document has no content.';
         }
 
         interface FoundElement {
@@ -1942,15 +1966,24 @@ export function registerDocsTools(
           }
         }
 
-        return JSON.stringify(
-          {
-            documentTitle: document.title,
-            totalFound: elements.length,
-            elements: elements,
-          },
-          null,
-          2
-        );
+        let result = `**Document:** ${document.title}\n`;
+        result += `**Found:** ${elements.length} element${elements.length !== 1 ? 's' : ''}\n\n`;
+
+        if (elements.length === 0) {
+          result += 'No matching elements found.';
+          return result;
+        }
+
+        elements.forEach((el, index) => {
+          result += `${index + 1}. **${el.type}** (indices ${el.startIndex}-${el.endIndex})\n`;
+          if (el.text) result += `   Text: ${el.text}\n`;
+          if (el.rows !== undefined) result += `   Size: ${el.rows} rows x ${el.columns} columns\n`;
+          if (el.listType) result += `   List type: ${el.listType}\n`;
+          if (el.imageUri) result += `   Image: ${el.imageUri}\n`;
+          result += '\n';
+        });
+
+        return result.trim();
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error finding elements in doc ${args.documentId}: ${message}`);
@@ -2075,7 +2108,9 @@ export function registerDocsTools(
         }
 
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
-        return `Successfully applied formatting to instance ${args.matchInstance} of "${args.textToFind}".`;
+        const email = await getAccountEmail(args.account);
+        const docLink = getDocsUrl(args.documentId, email);
+        return `Successfully applied formatting to instance ${args.matchInstance} of "${args.textToFind}".\nView document: ${docLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error in formatMatchingText for doc ${args.documentId}: ${message}`);

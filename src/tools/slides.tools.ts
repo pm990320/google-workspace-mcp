@@ -1,13 +1,10 @@
-// slides.tools.ts - Auto-generated tool module
+// slides.tools.ts - Slides tool module
 import { z } from 'zod';
-import { type slides_v1, type drive_v3 } from 'googleapis';
-import { type FastMCPServer, type PageElement, type SlidesRequest } from '../types.js';
+import { type SlidesToolOptions, type PageElement, type SlidesRequest } from '../types.js';
+import { getSlidesUrl } from '../urlHelpers.js';
 
-export function registerSlidesTools(
-  server: FastMCPServer,
-  getClient: (accountName: string) => Promise<slides_v1.Slides>,
-  getDrive: (accountName: string) => Promise<drive_v3.Drive>
-) {
+export function registerSlidesTools(options: SlidesToolOptions) {
+  const { server, getSlidesClient, getDriveClient, getAccountEmail } = options;
   server.addTool({
     name: 'listPresentations',
     description: 'List Google Slides presentations in Drive with optional search.',
@@ -16,21 +13,30 @@ export function registerSlidesTools(
       readOnlyHint: true,
       openWorldHint: true,
     },
-    parameters: z.object({
-      account: z.string().describe('Account name to use'),
-      maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
-      query: z
-        .string()
-        .optional()
-        .describe('Search query to filter presentations by name or content.'),
-      orderBy: z
-        .enum(['name', 'modifiedTime', 'createdTime'])
-        .optional()
-        .default('modifiedTime')
-        .describe('Sort order for results.'),
-    }),
+    parameters: z
+      .object({
+        account: z.string().describe('Account name to use'),
+        maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'Search query to filter presentations by name or content. Cannot be used with orderBy (Google Drive API limitation).'
+          ),
+        orderBy: z
+          .enum(['name', 'modifiedTime', 'createdTime'])
+          .optional()
+          .describe(
+            'Sort order for results (default: modifiedTime). Cannot be used with query (Google Drive API limitation).'
+          ),
+      })
+      .refine((data) => !(data.query && data.orderBy), {
+        message:
+          'Cannot use both query and orderBy together. Google Drive API does not support sorting when using fullText search.',
+        path: ['orderBy'],
+      }),
     async execute(args, { log: _log }) {
-      const drive = await getDrive(args.account);
+      const drive = await getDriveClient(args.account);
 
       let queryString = "mimeType='application/vnd.google-apps.presentation' and trashed=false";
       if (args.query) {
@@ -40,24 +46,34 @@ export function registerSlidesTools(
       const response = await drive.files.list({
         q: queryString,
         pageSize: args.maxResults,
-        orderBy: args.orderBy === 'name' ? 'name' : args.orderBy,
+        orderBy: args.orderBy ? (args.orderBy === 'name' ? 'name' : args.orderBy) : 'modifiedTime',
         fields: 'files(id, name, createdTime, modifiedTime, owners, webViewLink)',
       });
 
-      return JSON.stringify(
-        {
-          presentations: (response.data.files ?? []).map((f) => ({
-            id: f.id,
-            name: f.name,
-            createdTime: f.createdTime,
-            modifiedTime: f.modifiedTime,
-            owners: f.owners?.map((o) => o.emailAddress),
-            webViewLink: f.webViewLink,
-          })),
-        },
-        null,
-        2
-      );
+      const accountEmail = await getAccountEmail(args.account);
+      const presentations = response.data.files ?? [];
+
+      let result = `**Presentations (${presentations.length} found)**\n\n`;
+
+      if (presentations.length === 0) {
+        result += 'No presentations found.';
+        return result;
+      }
+
+      presentations.forEach((p, i) => {
+        const link = p.id ? getSlidesUrl(p.id, accountEmail) : p.webViewLink;
+        result += `${i + 1}. ${p.name}\n`;
+        result += `   ID: ${p.id}\n`;
+        result += `   Modified: ${p.modifiedTime}\n`;
+        result += `   Created: ${p.createdTime}\n`;
+        if (p.owners?.length) {
+          result += `   Owner: ${p.owners.map((o) => o.emailAddress).join(', ')}\n`;
+        }
+        if (link) result += `   Link: ${link}\n`;
+        result += '\n';
+      });
+
+      return result;
     },
   });
 
@@ -75,46 +91,60 @@ export function registerSlidesTools(
       presentationId: z.string().describe('Presentation ID (from URL)'),
     }),
     async execute(args, { log: _log }) {
-      const slides = await getClient(args.account);
+      const slides = await getSlidesClient(args.account);
 
       const response = await slides.presentations.get({
         presentationId: args.presentationId,
       });
 
       const pres = response.data;
+      const accountEmail = await getAccountEmail(args.account);
+      const link = pres.presentationId
+        ? getSlidesUrl(pres.presentationId, accountEmail)
+        : undefined;
 
-      return JSON.stringify(
-        {
-          presentationId: pres.presentationId,
-          title: pres.title,
-          locale: pres.locale,
-          pageSize: pres.pageSize,
-          slidesCount: pres.slides?.length || 0,
-          slides: pres.slides?.map((slide, idx) => {
-            // Extract text content from the slide
-            const textElements: string[] = [];
-            const extractText = (element: PageElement) => {
-              if (element.shape?.text?.textElements) {
-                for (const te of element.shape.text.textElements) {
-                  if (te.textRun?.content) {
-                    textElements.push(te.textRun.content.trim());
-                  }
+      let result = `**Presentation: ${pres.title}**\n\n`;
+      result += `ID: ${pres.presentationId}\n`;
+      result += `Locale: ${pres.locale || 'N/A'}\n`;
+      result += `Slides: ${pres.slides?.length || 0}\n`;
+      if (pres.pageSize) {
+        const width = pres.pageSize.width;
+        const height = pres.pageSize.height;
+        if (width?.magnitude && height?.magnitude) {
+          result += `Page Size: ${width.magnitude}${width.unit} x ${height.magnitude}${height.unit}\n`;
+        }
+      }
+      if (link) result += `Link: ${link}\n`;
+      result += '\n';
+
+      if (pres.slides && pres.slides.length > 0) {
+        result += '**Slides:**\n\n';
+        pres.slides.forEach((slide, idx) => {
+          // Extract text content from the slide
+          const textElements: string[] = [];
+          const extractText = (element: PageElement) => {
+            if (element.shape?.text?.textElements) {
+              for (const te of element.shape.text.textElements) {
+                if (te.textRun?.content) {
+                  textElements.push(te.textRun.content.trim());
                 }
               }
-            };
-            slide.pageElements?.forEach(extractText);
+            }
+          };
+          slide.pageElements?.forEach(extractText);
 
-            return {
-              slideIndex: idx,
-              objectId: slide.objectId,
-              textContent: textElements.filter((t) => t).join(' | '),
-              elementsCount: slide.pageElements?.length || 0,
-            };
-          }),
-        },
-        null,
-        2
-      );
+          const textContent = textElements.filter((t) => t).join(' | ');
+
+          result += `Slide ${idx + 1} (ID: ${slide.objectId})\n`;
+          result += `  Elements: ${slide.pageElements?.length || 0}\n`;
+          if (textContent) {
+            result += `  Text: ${textContent.substring(0, 200)}${textContent.length > 200 ? '...' : ''}\n`;
+          }
+          result += '\n';
+        });
+      }
+
+      return result;
     },
   });
 
@@ -134,7 +164,7 @@ export function registerSlidesTools(
       title: z.string().describe('Presentation title'),
     }),
     async execute(args, { log: _log }) {
-      const slides = await getClient(args.account);
+      const slides = await getSlidesClient(args.account);
 
       const response = await slides.presentations.create({
         requestBody: {
@@ -142,16 +172,18 @@ export function registerSlidesTools(
         },
       });
 
-      return JSON.stringify(
-        {
-          success: true,
-          presentationId: response.data.presentationId,
-          title: response.data.title,
-          slidesCount: response.data.slides?.length || 0,
-        },
-        null,
-        2
-      );
+      const accountEmail = await getAccountEmail(args.account);
+      const link = response.data.presentationId
+        ? getSlidesUrl(response.data.presentationId, accountEmail)
+        : undefined;
+
+      let result = 'Successfully created presentation.\n\n';
+      result += `Title: ${response.data.title}\n`;
+      result += `Presentation ID: ${response.data.presentationId}\n`;
+      result += `Initial Slides: ${response.data.slides?.length || 0}\n`;
+      if (link) result += `\nOpen presentation: ${link}`;
+
+      return result;
     },
   });
 
@@ -190,7 +222,7 @@ export function registerSlidesTools(
         .describe('Slide layout'),
     }),
     async execute(args, { log: _log }) {
-      const slides = await getClient(args.account);
+      const slides = await getSlidesClient(args.account);
 
       // First get the presentation to find layout IDs
       const pres = await slides.presentations.get({
@@ -227,15 +259,21 @@ export function registerSlidesTools(
         requestBody: { requests },
       });
 
-      return JSON.stringify(
-        {
-          success: true,
-          slideId,
-          presentationId: args.presentationId,
-        },
-        null,
-        2
-      );
+      const accountEmail = await getAccountEmail(args.account);
+      const link = getSlidesUrl(args.presentationId, accountEmail);
+
+      let result = 'Successfully added slide.\n\n';
+      result += `Slide ID: ${slideId}\n`;
+      result += `Layout: ${args.layout}\n`;
+      if (args.insertionIndex !== undefined) {
+        result += `Position: ${args.insertionIndex}\n`;
+      } else {
+        result += 'Position: End of presentation\n';
+      }
+      result += `Presentation ID: ${args.presentationId}\n`;
+      result += `\nOpen presentation: ${link}`;
+
+      return result;
     },
   });
 
@@ -261,7 +299,7 @@ export function registerSlidesTools(
       height: z.number().optional().default(100).describe('Height in points (default: 100)'),
     }),
     async execute(args, { log: _log }) {
-      const slides = await getClient(args.account);
+      const slides = await getSlidesClient(args.account);
 
       const textBoxId = 'textbox_' + Date.now().toString(36);
 
@@ -300,15 +338,18 @@ export function registerSlidesTools(
         requestBody: { requests },
       });
 
-      return JSON.stringify(
-        {
-          success: true,
-          textBoxId,
-          slideId: args.slideId,
-        },
-        null,
-        2
-      );
+      const accountEmail = await getAccountEmail(args.account);
+      const link = getSlidesUrl(args.presentationId, accountEmail);
+
+      let result = 'Successfully added text box to slide.\n\n';
+      result += `Text Box ID: ${textBoxId}\n`;
+      result += `Slide ID: ${args.slideId}\n`;
+      result += `Position: (${args.x}, ${args.y}) points\n`;
+      result += `Size: ${args.width} x ${args.height} points\n`;
+      result += `Text: ${args.text.substring(0, 100)}${args.text.length > 100 ? '...' : ''}\n`;
+      result += `\nOpen presentation: ${link}`;
+
+      return result;
     },
   });
 }

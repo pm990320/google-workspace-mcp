@@ -2,14 +2,12 @@
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { type drive_v3, type docs_v1 } from 'googleapis';
-import { AccountDocumentParameters, type FastMCPServer } from '../types.js';
+import { AccountDocumentParameters, type DriveToolOptions } from '../types.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
+import { addAuthUserToUrl, getDocsUrl, getDriveFileUrl, getDriveFolderUrl } from '../urlHelpers.js';
 
-export function registerDriveTools(
-  server: FastMCPServer,
-  getDriveClient: (accountName: string) => Promise<drive_v3.Drive>,
-  getDocsClient: (accountName: string) => Promise<docs_v1.Docs>
-) {
+export function registerDriveTools(options: DriveToolOptions) {
+  const { server, getDriveClient, getDocsClient, getAccountEmail } = options;
   // --- List Google Docs ---
   server.addTool({
     name: 'listGoogleDocs',
@@ -19,30 +17,43 @@ export function registerDriveTools(
       readOnlyHint: true,
       openWorldHint: true,
     },
-    parameters: z.object({
-      account: z
-        .string()
-        .min(1)
-        .describe(
-          'The name of the Google account to use. Use listAccounts to see available accounts.'
-        ),
-      maxResults: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .optional()
-        .default(20)
-        .describe('Maximum number of documents to return (1-100).'),
-      query: z.string().optional().describe('Search query to filter documents by name or content.'),
-      orderBy: z
-        .enum(['name', 'modifiedTime', 'createdTime'])
-        .optional()
-        .default('modifiedTime')
-        .describe('Sort order for results.'),
-    }),
+    parameters: z
+      .object({
+        account: z
+          .string()
+          .min(1)
+          .describe(
+            'The name of the Google account to use. Use listAccounts to see available accounts.'
+          ),
+        maxResults: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .default(20)
+          .describe('Maximum number of documents to return (1-100).'),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'Search query to filter documents by name or content. Cannot be used with orderBy (Google Drive API limitation).'
+          ),
+        orderBy: z
+          .enum(['name', 'modifiedTime', 'createdTime'])
+          .optional()
+          .describe(
+            'Sort order for results (default: modifiedTime). Cannot be used with query (Google Drive API limitation).'
+          ),
+      })
+      .refine((data) => !(data.query && data.orderBy), {
+        message:
+          'Cannot use both query and orderBy together. Google Drive API does not support sorting when using fullText search.',
+        path: ['orderBy'],
+      }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(
         `Listing Google Docs. Query: ${args.query || 'none'}, Max: ${args.maxResults}, Order: ${args.orderBy}`
       );
@@ -56,7 +67,11 @@ export function registerDriveTools(
         const response = await drive.files.list({
           q: queryString,
           pageSize: args.maxResults,
-          orderBy: args.orderBy === 'name' ? 'name' : args.orderBy,
+          orderBy: args.orderBy
+            ? args.orderBy === 'name'
+              ? 'name'
+              : args.orderBy
+            : 'modifiedTime',
           fields:
             'files(id,name,modifiedTime,createdTime,size,webViewLink,owners(displayName,emailAddress))',
         });
@@ -73,11 +88,12 @@ export function registerDriveTools(
             ? new Date(file.modifiedTime).toLocaleDateString()
             : 'Unknown';
           const owner = file.owners?.[0]?.displayName || 'Unknown';
+          const link = file.id ? getDocsUrl(file.id, email) : file.webViewLink;
           result += `${index + 1}. **${file.name}**\n`;
           result += `   ID: ${file.id}\n`;
           result += `   Modified: ${modifiedDate}\n`;
           result += `   Owner: ${owner}\n`;
-          result += `   Link: ${file.webViewLink}\n\n`;
+          result += `   Link: ${link}\n\n`;
         });
 
         return result;
@@ -133,6 +149,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Searching Google Docs for: "${args.searchQuery}" in ${args.searchIn}`);
 
       try {
@@ -169,11 +186,12 @@ export function registerDriveTools(
             ? new Date(file.modifiedTime).toLocaleDateString()
             : 'Unknown';
           const owner = file.owners?.[0]?.displayName || 'Unknown';
+          const link = file.id ? getDocsUrl(file.id, email) : file.webViewLink;
           result += `${index + 1}. **${file.name}**\n`;
           result += `   ID: ${file.id}\n`;
           result += `   Modified: ${modifiedDate}\n`;
           result += `   Owner: ${owner}\n`;
-          result += `   Link: ${file.webViewLink}\n\n`;
+          result += `   Link: ${link}\n\n`;
         });
 
         return result;
@@ -225,6 +243,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(
         `Getting recent Google Docs: ${args.maxResults} results, ${args.daysBack} days back`
       );
@@ -257,12 +276,13 @@ export function registerDriveTools(
             : 'Unknown';
           const lastModifier = file.lastModifyingUser?.displayName || 'Unknown';
           const owner = file.owners?.[0]?.displayName || 'Unknown';
+          const link = file.id ? getDocsUrl(file.id, email) : file.webViewLink;
 
           result += `${index + 1}. **${file.name}**\n`;
           result += `   ID: ${file.id}\n`;
           result += `   Last Modified: ${modifiedDate} by ${lastModifier}\n`;
           result += `   Owner: ${owner}\n`;
-          result += `   Link: ${file.webViewLink}\n\n`;
+          result += `   Link: ${link}\n\n`;
         });
 
         return result;
@@ -291,6 +311,7 @@ export function registerDriveTools(
     parameters: AccountDocumentParameters,
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Getting info for document: ${args.documentId}`);
 
       try {
@@ -301,6 +322,7 @@ export function registerDriveTools(
         });
 
         const file = response.data;
+        const link = file.id ? getDocsUrl(file.id, email) : file.webViewLink;
 
         const createdDate = file.createdTime
           ? new Date(file.createdTime).toLocaleString()
@@ -327,7 +349,7 @@ export function registerDriveTools(
         }
 
         result += `**Shared:** ${file.shared ? 'Yes' : 'No'}\n`;
-        result += `**View Link:** ${file.webViewLink}\n`;
+        result += `**View Link:** ${link}\n`;
 
         if (file.description) {
           result += `**Description:** ${file.description}\n`;
@@ -372,6 +394,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(
         `Creating folder "${args.name}" ${args.parentFolderId ? `in parent ${args.parentFolderId}` : 'in root'}`
       );
@@ -392,7 +415,8 @@ export function registerDriveTools(
         });
 
         const folder = response.data;
-        return `Successfully created folder "${folder.name}" (ID: ${folder.id})\nLink: ${folder.webViewLink}`;
+        const link = folder.id ? getDriveFolderUrl(folder.id, email) : folder.webViewLink;
+        return `Successfully created folder "${folder.name}" (ID: ${folder.id})\nLink: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error creating folder: ${message}`);
@@ -448,6 +472,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Listing contents of folder: ${args.folderId}`);
 
       try {
@@ -488,7 +513,9 @@ export function registerDriveTools(
         if (folders.length > 0 && args.includeSubfolders) {
           result += `**Folders (${folders.length}):**\n`;
           folders.forEach((folder) => {
+            const folderLink = folder.id ? getDriveFolderUrl(folder.id, email) : folder.webViewLink;
             result += `  ${folder.name} (ID: ${folder.id})\n`;
+            result += `     Link: ${folderLink}\n`;
           });
           result += '\n';
         }
@@ -508,11 +535,32 @@ export function registerDriveTools(
               ? new Date(file.modifiedTime).toLocaleDateString()
               : 'Unknown';
             const owner = file.owners?.[0]?.displayName || 'Unknown';
+            // Use appropriate URL based on file type
+            let link: string | null | undefined;
+            if (file.id) {
+              if (file.mimeType === 'application/vnd.google-apps.document') {
+                link = getDocsUrl(file.id, email);
+              } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+                link = addAuthUserToUrl(
+                  file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+                  email
+                );
+              } else if (file.mimeType === 'application/vnd.google-apps.presentation') {
+                link = addAuthUserToUrl(
+                  file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`,
+                  email
+                );
+              } else {
+                link = getDriveFileUrl(file.id, email);
+              }
+            } else {
+              link = file.webViewLink;
+            }
 
             result += `[${fileType}] ${file.name}\n`;
             result += `   ID: ${file.id}\n`;
             result += `   Modified: ${modifiedDate} by ${owner}\n`;
-            result += `   Link: ${file.webViewLink}\n\n`;
+            result += `   Link: ${link}\n\n`;
           });
         }
 
@@ -549,13 +597,14 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Getting folder info: ${args.folderId}`);
 
       try {
         const response = await drive.files.get({
           fileId: args.folderId,
           fields:
-            'id,name,description,createdTime,modifiedTime,webViewLink,owners(displayName,emailAddress),lastModifyingUser(displayName),shared,parents',
+            'id,name,mimeType,description,createdTime,modifiedTime,webViewLink,owners(displayName,emailAddress),lastModifyingUser(displayName),shared,parents',
         });
 
         const folder = response.data;
@@ -564,6 +613,7 @@ export function registerDriveTools(
           throw new UserError('The specified ID does not belong to a folder.');
         }
 
+        const link = folder.id ? getDriveFolderUrl(folder.id, email) : folder.webViewLink;
         const createdDate = folder.createdTime
           ? new Date(folder.createdTime).toLocaleString()
           : 'Unknown';
@@ -588,7 +638,7 @@ export function registerDriveTools(
         }
 
         result += `**Shared:** ${folder.shared ? 'Yes' : 'No'}\n`;
-        result += `**View Link:** ${folder.webViewLink}\n`;
+        result += `**View Link:** ${link}\n`;
 
         if (folder.description) {
           result += `**Description:** ${folder.description}\n`;
@@ -641,12 +691,13 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Moving file ${args.fileId} to folder ${args.newParentId}`);
 
       try {
         const fileInfo = await drive.files.get({
           fileId: args.fileId,
-          fields: 'name,parents',
+          fields: 'name,parents,mimeType',
         });
 
         const fileName = fileInfo.data.name;
@@ -665,7 +716,8 @@ export function registerDriveTools(
         });
 
         const action = args.removeFromAllParents ? 'moved' : 'copied';
-        return `Successfully ${action} "${fileName}" to new location.\nFile ID: ${response.data.id}`;
+        const destFolderLink = getDriveFolderUrl(args.newParentId, email);
+        return `Successfully ${action} "${fileName}" to new location.\nFile ID: ${response.data.id}\nDestination Folder: ${destFolderLink}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error moving file: ${message}`);
@@ -713,6 +765,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Copying file ${args.fileId} ${args.newName ? `as "${args.newName}"` : ''}`);
 
       try {
@@ -734,11 +787,25 @@ export function registerDriveTools(
         const response = await drive.files.copy({
           fileId: args.fileId,
           requestBody: copyMetadata,
-          fields: 'id,name,webViewLink',
+          fields: 'id,name,webViewLink,mimeType',
         });
 
         const copiedFile = response.data;
-        return `Successfully created copy "${copiedFile.name}" (ID: ${copiedFile.id})\nLink: ${copiedFile.webViewLink}`;
+        let link: string | null | undefined;
+        if (copiedFile.id) {
+          if (copiedFile.mimeType === 'application/vnd.google-apps.document') {
+            link = getDocsUrl(copiedFile.id, email);
+          } else if (copiedFile.mimeType === 'application/vnd.google-apps.folder') {
+            link = getDriveFolderUrl(copiedFile.id, email);
+          } else {
+            link = copiedFile.webViewLink
+              ? addAuthUserToUrl(copiedFile.webViewLink, email)
+              : getDriveFileUrl(copiedFile.id, email);
+          }
+        } else {
+          link = copiedFile.webViewLink;
+        }
+        return `Successfully created copy "${copiedFile.name}" (ID: ${copiedFile.id})\nLink: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error copying file: ${message}`);
@@ -777,6 +844,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Renaming file ${args.fileId} to "${args.newName}"`);
 
       try {
@@ -785,11 +853,25 @@ export function registerDriveTools(
           requestBody: {
             name: args.newName,
           },
-          fields: 'id,name,webViewLink',
+          fields: 'id,name,webViewLink,mimeType',
         });
 
         const file = response.data;
-        return `Successfully renamed to "${file.name}" (ID: ${file.id})\nLink: ${file.webViewLink}`;
+        let link: string | null | undefined;
+        if (file.id) {
+          if (file.mimeType === 'application/vnd.google-apps.document') {
+            link = getDocsUrl(file.id, email);
+          } else if (file.mimeType === 'application/vnd.google-apps.folder') {
+            link = getDriveFolderUrl(file.id, email);
+          } else {
+            link = file.webViewLink
+              ? addAuthUserToUrl(file.webViewLink, email)
+              : getDriveFileUrl(file.id, email);
+          }
+        } else {
+          link = file.webViewLink;
+        }
+        return `Successfully renamed to "${file.name}" (ID: ${file.id})\nLink: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error renaming file: ${message}`);
@@ -887,6 +969,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Creating new document "${args.title}"`);
 
       try {
@@ -905,7 +988,8 @@ export function registerDriveTools(
         });
 
         const document = response.data;
-        let result = `Successfully created document "${document.name}" (ID: ${document.id})\nView Link: ${document.webViewLink}`;
+        const link = document.id ? getDocsUrl(document.id, email) : document.webViewLink;
+        let result = `Successfully created document "${document.name}" (ID: ${document.id})\nView Link: ${link}`;
 
         if (args.initialContent && document.id) {
           try {
@@ -982,6 +1066,7 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
       log.info(`Creating document from template ${args.templateId} with title "${args.newTitle}"`);
 
       try {
@@ -1000,7 +1085,8 @@ export function registerDriveTools(
         });
 
         const document = response.data;
-        let result = `Successfully created document "${document.name}" from template (ID: ${document.id})\nView Link: ${document.webViewLink}`;
+        const link = document.id ? getDocsUrl(document.id, email) : document.webViewLink;
+        let result = `Successfully created document "${document.name}" from template (ID: ${document.id})\nView Link: ${link}`;
 
         if (args.replacements && Object.keys(args.replacements).length > 0) {
           try {

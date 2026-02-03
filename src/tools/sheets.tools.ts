@@ -1,16 +1,14 @@
 // sheets.tools.ts - Google Sheets tool module
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { type sheets_v4, type drive_v3 } from 'googleapis';
+import type { drive_v3 } from 'googleapis';
 import * as SheetsHelpers from '../googleSheetsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
-import { type FastMCPServer } from '../types.js';
+import { type SheetsToolOptions } from '../types.js';
+import { getSheetsUrl } from '../urlHelpers.js';
 
-export function registerSheetsTools(
-  server: FastMCPServer,
-  getSheetsClient: (accountName: string) => Promise<sheets_v4.Sheets>,
-  getDriveClient: (accountName: string) => Promise<drive_v3.Drive>
-) {
+export function registerSheetsTools(options: SheetsToolOptions) {
+  const { server, getSheetsClient, getDriveClient, getAccountEmail } = options;
   // --- Read Spreadsheet ---
   server.addTool({
     name: 'readSpreadsheet',
@@ -47,10 +45,13 @@ export function registerSheetsTools(
           return `Range ${args.range} is empty or does not exist.`;
         }
 
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
         let result = `**Spreadsheet Range:** ${args.range}\n\n`;
         values.forEach((row, index) => {
           result += `Row ${index + 1}: ${JSON.stringify(row)}\n`;
         });
+        result += `\nView spreadsheet: ${link}`;
 
         return result;
       } catch (error: unknown) {
@@ -112,8 +113,10 @@ export function registerSheetsTools(
         const updatedCells = response.updatedCells || 0;
         const updatedRows = response.updatedRows || 0;
         const updatedColumns = response.updatedColumns || 0;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
 
-        return `Successfully wrote ${updatedCells} cells (${updatedRows} rows, ${updatedColumns} columns) to range ${args.range}.`;
+        return `Successfully wrote ${updatedCells} cells (${updatedRows} rows, ${updatedColumns} columns) to range ${args.range}.\nView spreadsheet: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error writing to spreadsheet ${args.spreadsheetId}: ${message}`);
@@ -174,8 +177,10 @@ export function registerSheetsTools(
         const updatedCells = response.updates?.updatedCells || 0;
         const updatedRows = response.updates?.updatedRows || 0;
         const updatedRange = response.updates?.updatedRange || args.range;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
 
-        return `Successfully appended ${updatedRows} row(s) (${updatedCells} cells) to spreadsheet. Updated range: ${updatedRange}`;
+        return `Successfully appended ${updatedRows} row(s) (${updatedCells} cells) to spreadsheet. Updated range: ${updatedRange}\nView spreadsheet: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error appending to spreadsheet ${args.spreadsheetId}: ${message}`);
@@ -213,8 +218,10 @@ export function registerSheetsTools(
       try {
         const response = await SheetsHelpers.clearRange(sheets, args.spreadsheetId, args.range);
         const clearedRange = response.clearedRange || args.range;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
 
-        return `Successfully cleared range ${clearedRange}.`;
+        return `Successfully cleared range ${clearedRange}.\nView spreadsheet: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error clearing range in spreadsheet ${args.spreadsheetId}: ${message}`);
@@ -248,11 +255,13 @@ export function registerSheetsTools(
 
       try {
         const metadata = await SheetsHelpers.getSpreadsheetMetadata(sheets, args.spreadsheetId);
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
 
         let result = '**Spreadsheet Information:**\n\n';
         result += `**Title:** ${metadata.properties?.title || 'Untitled'}\n`;
         result += `**ID:** ${metadata.spreadsheetId}\n`;
-        result += `**URL:** https://docs.google.com/spreadsheets/d/${metadata.spreadsheetId}\n\n`;
+        result += `**URL:** ${link}\n\n`;
 
         const sheetList = metadata.sheets ?? [];
         result += `**Sheets (${sheetList.length}):**\n`;
@@ -310,7 +319,9 @@ export function registerSheetsTools(
           throw new UserError('Failed to add sheet - no sheet properties returned.');
         }
 
-        return `Successfully added sheet "${addedSheet.title}" (Sheet ID: ${addedSheet.sheetId}) to spreadsheet.`;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
+        return `Successfully added sheet "${addedSheet.title}" (Sheet ID: ${addedSheet.sheetId}) to spreadsheet.\nView spreadsheet: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error adding sheet to spreadsheet ${args.spreadsheetId}: ${message}`);
@@ -377,7 +388,9 @@ export function registerSheetsTools(
           throw new UserError('Failed to create spreadsheet - no ID returned.');
         }
 
-        let result = `Successfully created spreadsheet "${driveResponse.data.name}" (ID: ${spreadsheetId})\nView Link: ${driveResponse.data.webViewLink}`;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(spreadsheetId, email);
+        let result = `Successfully created spreadsheet "${driveResponse.data.name}" (ID: ${spreadsheetId})\nView Link: ${link}`;
 
         if (args.initialData && args.initialData.length > 0) {
           try {
@@ -487,7 +500,9 @@ export function registerSheetsTools(
 
         await SheetsHelpers.deleteSheet(sheets, args.spreadsheetId, sheetIdToDelete);
 
-        return `Successfully deleted sheet "${sheetTitleDeleted}" (ID: ${sheetIdToDelete}) from spreadsheet.`;
+        const email = await getAccountEmail(args.account);
+        const link = getSheetsUrl(args.spreadsheetId, email);
+        return `Successfully deleted sheet "${sheetTitleDeleted}" (ID: ${sheetIdToDelete}) from spreadsheet.\nView spreadsheet: ${link}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error deleting sheet from spreadsheet ${args.spreadsheetId}: ${message}`);
@@ -506,35 +521,44 @@ export function registerSheetsTools(
       readOnlyHint: true,
       openWorldHint: true,
     },
-    parameters: z.object({
-      account: z
-        .string()
-        .min(1)
-        .describe(
-          'The name of the Google account to use. Use listAccounts to see available accounts.'
-        ),
-      maxResults: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .optional()
-        .default(20)
-        .describe('Maximum number of spreadsheets to return (1-100).'),
-      query: z
-        .string()
-        .optional()
-        .describe('Search query to filter spreadsheets by name or content.'),
-      orderBy: z
-        .enum(['name', 'modifiedTime', 'createdTime'])
-        .optional()
-        .default('modifiedTime')
-        .describe('Sort order for results.'),
-    }),
+    parameters: z
+      .object({
+        account: z
+          .string()
+          .min(1)
+          .describe(
+            'The name of the Google account to use. Use listAccounts to see available accounts.'
+          ),
+        maxResults: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .default(20)
+          .describe('Maximum number of spreadsheets to return (1-100).'),
+        query: z
+          .string()
+          .optional()
+          .describe(
+            'Search query to filter spreadsheets by name or content. Cannot be used with orderBy (Google Drive API limitation).'
+          ),
+        orderBy: z
+          .enum(['name', 'modifiedTime', 'createdTime'])
+          .optional()
+          .describe(
+            'Sort order for results (default: modifiedTime). Cannot be used with query (Google Drive API limitation).'
+          ),
+      })
+      .refine((data) => !(data.query && data.orderBy), {
+        message:
+          'Cannot use both query and orderBy together. Google Drive API does not support sorting when using fullText search.',
+        path: ['orderBy'],
+      }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
       log.info(
-        `Listing Google Sheets. Query: ${args.query || 'none'}, Max: ${args.maxResults}, Order: ${args.orderBy}`
+        `Listing Google Sheets. Query: ${args.query || 'none'}, Max: ${args.maxResults}, Order: ${args.orderBy || 'modifiedTime'}`
       );
 
       try {
@@ -546,7 +570,11 @@ export function registerSheetsTools(
         const response = await drive.files.list({
           q: queryString,
           pageSize: args.maxResults,
-          orderBy: args.orderBy === 'name' ? 'name' : args.orderBy,
+          orderBy: args.orderBy
+            ? args.orderBy === 'name'
+              ? 'name'
+              : args.orderBy
+            : 'modifiedTime',
           fields:
             'files(id,name,modifiedTime,createdTime,size,webViewLink,owners(displayName,emailAddress))',
         });
@@ -557,17 +585,19 @@ export function registerSheetsTools(
           return 'No Google Spreadsheets found matching your criteria.';
         }
 
+        const email = await getAccountEmail(args.account);
         let result = `Found ${files.length} Google Spreadsheet(s):\n\n`;
         files.forEach((file, index) => {
           const modifiedDate = file.modifiedTime
             ? new Date(file.modifiedTime).toLocaleDateString()
             : 'Unknown';
           const owner = file.owners?.[0]?.displayName || 'Unknown';
+          const link = file.id ? getSheetsUrl(file.id, email) : file.webViewLink;
           result += `${index + 1}. **${file.name}**\n`;
           result += `   ID: ${file.id}\n`;
           result += `   Modified: ${modifiedDate}\n`;
           result += `   Owner: ${owner}\n`;
-          result += `   Link: ${file.webViewLink}\n\n`;
+          result += `   Link: ${link}\n\n`;
         });
 
         return result;
