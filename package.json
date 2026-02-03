@@ -1,12 +1,19 @@
 {
   "name": "google-workspace-mcp",
   "version": "2.0.0",
+  "description": "MCP server for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms",
   "type": "module",
   "main": "dist/cli.js",
+  "types": "dist/cli.d.ts",
   "bin": {
     "google-workspace-mcp": "dist/cli.js",
     "gwmcp": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test 'tests/**/*.test.js'",
     "test:coverage": "c8 --include='dist/**/*.js' --exclude='dist/cli.js' node --test 'tests/**/*.test.js'",
@@ -15,13 +22,17 @@
     "lint": "gts lint",
     "fix": "gts fix",
     "clean": "gts clean",
+    "typecheck": "tsc --noEmit",
     "prepare": "npm run build",
     "pretest": "npm run build",
-    "posttest": "npm run lint"
+    "posttest": "npm run lint",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "google",
+    "google-workspace",
     "workspace",
     "docs",
     "sheets",
@@ -32,11 +43,22 @@
     "forms",
     "claude",
     "anthropic",
-    "ai"
+    "ai",
+    "llm"
   ],
-  "author": "",
+  "author": "pm990320",
   "license": "MIT",
-  "description": "MCP server for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pm990320/google-workspace-mcp.git"
+  },
+  "homepage": "https://github.com/pm990320/google-workspace-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/pm990320/google-workspace-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "commander": "^14.0.3",
     "fastmcp": "^3.24.0",
