@@ -2493,9 +2493,12 @@ server.addTool({
   }
 });
 
+// Store pending OAuth sessions
+const pendingOAuthSessions: Map<string, { port: number; authUrl: string; resolve: (config: AccountConfig) => void; reject: (err: Error) => void }> = new Map();
+
 server.addTool({
   name: 'addAccount',
-  description: 'Adds a new Google account to the MCP server. Opens an OAuth flow for authentication. The account name must be unique and contain only letters, numbers, underscores, and hyphens.',
+  description: 'Starts the OAuth flow to add a new Google account. Returns an authorization URL that must be opened in a browser. After authorizing, call completeAddAccount to finish the setup. The account name must be unique and contain only letters, numbers, underscores, and hyphens.',
   parameters: z.object({
     name: z.string()
       .min(1)
@@ -2503,29 +2506,61 @@ server.addTool({
       .describe('A unique name for this account (e.g., "work", "personal", "client-abc")')
   }),
   execute: async (args, { log }) => {
-    log.info(`Adding account: ${args.name}`);
+    log.info(`Starting OAuth flow for account: ${args.name}`);
     await ensureAccountsInitialized();
 
     try {
-      // Start the OAuth flow and wait for completion
-      const accountConfig = await completeAddAccount(args.name, 3000 + Math.floor(Math.random() * 1000), (authUrl) => {
-        console.error(`\n===================================`);
-        console.error(`Please open this URL in your browser to authorize:`);
-        console.error(authUrl);
-        console.error(`===================================\n`);
+      // Check if account already exists
+      const accounts = await listAccountsFromRegistry();
+      if (accounts.some(a => a.name === args.name)) {
+        throw new UserError(`Account "${args.name}" already exists. Use removeAccount first if you want to re-add it.`);
+      }
+
+      const port = 3000 + Math.floor(Math.random() * 1000);
+
+      // Start the OAuth flow in the background
+      const oauthPromise = completeAddAccount(args.name, port, (authUrl) => {
+        // Store the session info
+        pendingOAuthSessions.set(args.name, {
+          port,
+          authUrl,
+          resolve: () => {},
+          reject: () => {}
+        });
       });
 
-      let result = `Successfully added account "${args.name}"!\n\n`;
-      if (accountConfig.email) {
-        result += `Email: ${accountConfig.email}\n`;
-      }
-      result += `Added: ${accountConfig.addedAt}\n\n`;
-      result += `You can now use "${args.name}" as the 'account' parameter in other tools.`;
+      // Give it a moment to start the server and generate the URL
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      return result;
+      const session = pendingOAuthSessions.get(args.name);
+      if (!session) {
+        throw new UserError('Failed to start OAuth flow');
+      }
+
+      // Set up the promise handlers
+      oauthPromise.then(config => {
+        pendingOAuthSessions.delete(args.name);
+        log.info(`OAuth completed for account: ${args.name}`);
+      }).catch(err => {
+        pendingOAuthSessions.delete(args.name);
+        log.error(`OAuth failed for account: ${args.name}: ${err.message}`);
+      });
+
+      return `**OAuth Authorization Required for "${args.name}"**
+
+Please open this URL in your browser to authorize:
+
+${session.authUrl}
+
+After you authorize in your browser, the account will be added automatically.
+
+Listening on port ${port} for the OAuth callback...
+
+**Note:** If you're using Claude Desktop, you may need to open this URL manually or use the Playwright MCP to automate the browser authorization.`;
     } catch (error: any) {
-      log.error(`Error adding account: ${error.message || error}`);
-      throw new UserError(`Failed to add account: ${error.message || 'Unknown error'}`);
+      log.error(`Error starting OAuth: ${error.message || error}`);
+      if (error instanceof UserError) throw error;
+      throw new UserError(`Failed to start OAuth flow: ${error.message || 'Unknown error'}`);
     }
   }
 });

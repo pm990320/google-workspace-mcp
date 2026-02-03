@@ -5,6 +5,7 @@ import { JWT } from 'google-auth-library'; // ADDED: Import for Service Account 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as readline from 'readline/promises';
+import * as http from 'http';
 import { fileURLToPath } from 'url';
 
 // --- Calculate paths relative to this script file (ESM way) ---
@@ -97,13 +98,11 @@ async function saveCredentials(client: OAuth2Client): Promise<void> {
 
 async function authenticate(): Promise<OAuth2Client> {
   const { client_secret, client_id, redirect_uris, client_type } = await loadClientSecrets();
-  // For web clients, use the configured redirect URI; for desktop clients, use 'urn:ietf:wg:oauth:2.0:oob'
-  const redirectUri = client_type === 'web' ? redirect_uris[0] : 'urn:ietf:wg:oauth:2.0:oob';
+  // Use localhost redirect for desktop apps (OOB flow is deprecated)
+  const redirectUri = client_type === 'web' ? redirect_uris[0] : 'http://localhost:3000';
   console.error(`DEBUG: Using redirect URI: ${redirectUri}`);
   console.error(`DEBUG: Client type: ${client_type}`);
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
-
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
   const authorizeUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -112,22 +111,73 @@ async function authenticate(): Promise<OAuth2Client> {
 
   console.error('DEBUG: Generated auth URL:', authorizeUrl);
   console.error('Authorize this app by visiting this url:', authorizeUrl);
-  const code = await rl.question('Enter the code from that page here: ');
-  rl.close();
 
-  try {
-    const { tokens } = await oAuth2Client.getToken(code);
-    oAuth2Client.setCredentials(tokens);
-    if (tokens.refresh_token) { // Save only if we got a refresh token
-         await saveCredentials(oAuth2Client);
-    } else {
-         console.error("Did not receive refresh token. Token might expire.");
+  // For desktop apps, start a local server to receive the OAuth callback
+  if (client_type === 'installed') {
+    return new Promise((resolve, reject) => {
+      const server = http.createServer(async (req, res) => {
+        try {
+          const url = new URL(req.url || '', `http://localhost:3000`);
+          const code = url.searchParams.get('code');
+
+          if (code) {
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end('<html><body><h1>Authentication successful!</h1><p>You can close this window.</p></body></html>');
+
+            server.close();
+
+            const { tokens } = await oAuth2Client.getToken(code);
+            oAuth2Client.setCredentials(tokens);
+            if (tokens.refresh_token) {
+              await saveCredentials(oAuth2Client);
+            } else {
+              console.error("Did not receive refresh token. Token might expire.");
+            }
+            console.error('Authentication successful!');
+            resolve(oAuth2Client);
+          } else {
+            res.writeHead(400, { 'Content-Type': 'text/html' });
+            res.end('<html><body><h1>Error: No code received</h1></body></html>');
+          }
+        } catch (err) {
+          console.error('Error retrieving access token', err);
+          res.writeHead(500, { 'Content-Type': 'text/html' });
+          res.end('<html><body><h1>Authentication failed</h1></body></html>');
+          server.close();
+          reject(new Error('Authentication failed'));
+        }
+      });
+
+      server.listen(3000, () => {
+        console.error('Local server started on http://localhost:3000');
+        console.error('Waiting for OAuth callback...');
+      });
+
+      server.on('error', (err) => {
+        console.error('Server error:', err);
+        reject(err);
+      });
+    });
+  } else {
+    // For web clients, use readline to get the code manually
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const code = await rl.question('Enter the code from that page here: ');
+    rl.close();
+
+    try {
+      const { tokens } = await oAuth2Client.getToken(code);
+      oAuth2Client.setCredentials(tokens);
+      if (tokens.refresh_token) {
+        await saveCredentials(oAuth2Client);
+      } else {
+        console.error("Did not receive refresh token. Token might expire.");
+      }
+      console.error('Authentication successful!');
+      return oAuth2Client;
+    } catch (err) {
+      console.error('Error retrieving access token', err);
+      throw new Error('Authentication failed');
     }
-    console.error('Authentication successful!');
-    return oAuth2Client;
-  } catch (err) {
-    console.error('Error retrieving access token', err);
-    throw new Error('Authentication failed');
   }
 }
 
