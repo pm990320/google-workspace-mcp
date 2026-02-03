@@ -2,6 +2,25 @@
 
 You are testing the Google Workspace MCP server, which provides tools for interacting with Google Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms.
 
+---
+
+## ⚠️ IMPORTANT: PERMISSION REQUIRED FOR EXTERNAL ACTIONS
+
+**BEFORE SENDING ANY EMAILS OR TAKING ANY ACTIONS THAT INVOLVE THIRD PARTIES, YOU MUST:**
+
+1. **STOP AND ASK THE USER FOR EXPLICIT PERMISSION**
+2. **CLEARLY STATE WHAT ACTION YOU ARE ABOUT TO TAKE** (e.g., "I am about to send an email to test@example.com")
+3. **WAIT FOR USER CONFIRMATION BEFORE PROCEEDING**
+
+**THIS APPLIES TO:**
+- Sending drafts (`sendGmailDraft`)
+- Creating calendar events with attendees
+- Any action that could notify or contact external parties
+
+**DO NOT PROCEED WITH THESE ACTIONS WITHOUT EXPLICIT USER APPROVAL.**
+
+---
+
 ## Instructions
 
 1. **Create a TODO list** at the start with all test phases and individual tool tests
@@ -121,7 +140,7 @@ First, list available accounts and use one for all subsequent tests. Store the a
 
 ## Phase 4: Gmail Lifecycle
 
-**Goal:** Test email operations using drafts (avoid sending actual emails).
+**Goal:** Test email operations using the safe draft-based workflow. Emails cannot be sent directly - they must go through the draft workflow: create → review → send.
 
 ### Tests to perform:
 
@@ -129,11 +148,17 @@ First, list available accounts and use one for all subsequent tests. Store the a
 2. **List recent inbox messages** and note one message ID for testing
 3. **Search Gmail** for messages matching a simple query
 4. **Read a message** in full format using the ID from step 2
-5. **Create a draft email** addressed to a fake address with test subject and body
-6. **Read the draft message** you just created
-7. **Add a star label** to the draft message
-8. **Delete the draft**
-9. **(Optional) Send a test email to yourself and then delete it** - only if explicitly requested
+5. **Create a draft email** addressed to a test address with test subject and body
+6. **List all drafts** to verify your draft appears
+7. **Read the draft** to verify its content
+8. **Update the draft** - change the subject line
+9. **Read the draft again** to verify the update
+10. **Add a star label** to the draft's message using `addGmailLabel`
+11. **Remove the star label** from the message using `removeGmailLabel`
+12. **Send the draft** to actually send it (will go to the test address)
+13. **Create another draft** for cleanup testing
+14. **Delete the draft** (permanent deletion)
+15. **Delete the sent message** (moves to trash)
 
 ---
 
@@ -208,11 +233,11 @@ The following tools have known limitations and are excluded:
 | 1 | Docs | 29 |
 | 2 | Drive | 10 |
 | 3 | Sheets | 10 |
-| 4 | Gmail | 8 |
+| 4 | Gmail | 15 |
 | 5 | Calendar | 7 |
 | 6 | Slides | 7 |
 | 7 | Forms | 9 |
-| **Total** | | **~81** |
+| **Total** | | **~88** |
 
 ---
 
