@@ -5,7 +5,6 @@ import {
   type TextStyleArgs,
   type ParagraphStyleArgs,
   hexToRgbColor,
-  NotImplementedError,
   type DocsClient,
   type StructuralElement,
   type ParagraphElement,
@@ -38,8 +37,6 @@ async function executeSingleBatch(
     const apiError = isGoogleApiError(error) ? error : null;
     const code = apiError?.code;
     const responseData = apiError?.response?.data;
-
-    console.error(`Google API batchUpdate Error for doc ${documentId}:`, responseData || message);
 
     // Translate common API errors to UserErrors
     if (code === 400 && message.includes('Invalid requests')) {
@@ -86,20 +83,12 @@ export async function executeBatchUpdate(
 
   // Split into multiple batches and execute sequentially
   // Note: Sequential execution is required because document indices change after each batch
-  console.warn(
-    `Splitting ${requests.length} requests into ${Math.ceil(requests.length / MAX_BATCH_UPDATE_REQUESTS)} batches of up to ${MAX_BATCH_UPDATE_REQUESTS} each.`
-  );
 
   const allReplies: docs_v1.Schema$Response[] = [];
   let lastDocumentId = documentId;
 
   for (let i = 0; i < requests.length; i += MAX_BATCH_UPDATE_REQUESTS) {
     const batch = requests.slice(i, i + MAX_BATCH_UPDATE_REQUESTS);
-    const batchNum = Math.floor(i / MAX_BATCH_UPDATE_REQUESTS) + 1;
-    const totalBatches = Math.ceil(requests.length / MAX_BATCH_UPDATE_REQUESTS);
-
-    console.warn(`Executing batch ${batchNum}/${totalBatches} (${batch.length} requests)...`);
-
     const response = await executeSingleBatch(docs, documentId, batch);
 
     if (response.replies) {
@@ -134,7 +123,6 @@ export async function findTextRange(
     });
 
     if (!res.data.body?.content) {
-      console.warn(`No content found in document ${documentId}`);
       return null;
     }
 
@@ -188,10 +176,6 @@ export async function findTextRange(
     // Sort segments by starting position to ensure correct ordering
     segments.sort((a, b) => a.start - b.start);
 
-    console.log(
-      `Document ${documentId} contains ${segments.length} text segments and ${fullText.length} characters in total.`
-    );
-
     // Find the specified instance of the text
     let startIndex = -1;
     let endIndex = -1;
@@ -201,25 +185,15 @@ export async function findTextRange(
     while (foundCount < instance) {
       const currentIndex = fullText.indexOf(textToFind, searchStartIndex);
       if (currentIndex === -1) {
-        console.log(
-          `Search text "${textToFind}" not found for instance ${foundCount + 1} (requested: ${instance})`
-        );
         break;
       }
 
       foundCount++;
-      console.log(
-        `Found instance ${foundCount} of "${textToFind}" at position ${currentIndex} in full text`
-      );
 
       if (foundCount === instance) {
         const targetStartInFullText = currentIndex;
         const targetEndInFullText = currentIndex + textToFind.length;
         let currentPosInFullText = 0;
-
-        console.log(
-          `Target text range in full text: ${targetStartInFullText}-${targetEndInFullText}`
-        );
 
         for (const seg of segments) {
           const segStartInFullText = currentPosInFullText;
@@ -233,12 +207,10 @@ export async function findTextRange(
             targetStartInFullText < segEndInFullText
           ) {
             startIndex = seg.start + (targetStartInFullText - segStartInFullText);
-            console.log(`Mapped start to segment ${seg.start}-${seg.end}, position ${startIndex}`);
           }
 
           if (targetEndInFullText > segStartInFullText && targetEndInFullText <= segEndInFullText) {
             endIndex = seg.start + (targetEndInFullText - segStartInFullText);
-            console.log(`Mapped end to segment ${seg.start}-${seg.end}, position ${endIndex}`);
             break;
           }
 
@@ -246,9 +218,6 @@ export async function findTextRange(
         }
 
         if (startIndex === -1 || endIndex === -1) {
-          console.warn(
-            `Failed to map text "${textToFind}" instance ${instance} to actual document indices`
-          );
           // Reset and try next occurrence
           startIndex = -1;
           endIndex = -1;
@@ -257,9 +226,6 @@ export async function findTextRange(
           continue;
         }
 
-        console.log(
-          `Successfully mapped "${textToFind}" to document range ${startIndex}-${endIndex}`
-        );
         return { startIndex, endIndex };
       }
 
@@ -267,14 +233,10 @@ export async function findTextRange(
       searchStartIndex = currentIndex + 1;
     }
 
-    console.warn(
-      `Could not find instance ${instance} of text "${textToFind}" in document ${documentId}`
-    );
     return null; // Instance not found or mapping failed for all attempts
   } catch (error: unknown) {
     const message = getErrorMessage(error);
     const code = isGoogleApiError(error) ? error.code : undefined;
-    console.error(`Error finding text "${textToFind}" in doc ${documentId}: ${message}`);
     if (code === 404)
       throw new UserError(`Document not found while searching text (ID: ${documentId}).`);
     if (code === 403)
@@ -291,8 +253,6 @@ export async function getParagraphRange(
   indexWithin: number
 ): Promise<{ startIndex: number; endIndex: number } | null> {
   try {
-    console.log(`Finding paragraph containing index ${indexWithin} in document ${documentId}`);
-
     // Request more detailed document structure to handle nested elements
     const res = await docs.documents.get({
       documentId,
@@ -301,7 +261,6 @@ export async function getParagraphRange(
     });
 
     if (!res.data.body?.content) {
-      console.warn(`No content found in document ${documentId}`);
       return null;
     }
 
@@ -322,9 +281,6 @@ export async function getParagraphRange(
           if (indexWithin >= element.startIndex && indexWithin < element.endIndex) {
             // If it's a paragraph, we've found our target
             if (element.paragraph) {
-              console.log(
-                `Found paragraph containing index ${indexWithin}, range: ${element.startIndex}-${element.endIndex}`
-              );
               return {
                 startIndex: element.startIndex,
                 endIndex: element.endIndex,
@@ -333,7 +289,6 @@ export async function getParagraphRange(
 
             // If it's a table, we need to check cells recursively
             if (element.table?.tableRows) {
-              console.log(`Index ${indexWithin} is within a table, searching cells...`);
               for (const row of element.table.tableRows) {
                 if (row.tableCells) {
                   for (const cell of row.tableCells) {
@@ -345,12 +300,6 @@ export async function getParagraphRange(
                 }
               }
             }
-
-            // For other structural elements, we didn't find a paragraph
-            // but we know the index is within this element
-            console.warn(
-              `Index ${indexWithin} is within element (${element.startIndex}-${element.endIndex}) but not in a paragraph`
-            );
           }
         }
       }
@@ -358,23 +307,10 @@ export async function getParagraphRange(
       return null;
     };
 
-    const paragraphRange = findParagraphInContent(res.data.body.content);
-
-    if (!paragraphRange) {
-      console.warn(`Could not find paragraph containing index ${indexWithin}`);
-    } else {
-      console.log(
-        `Returning paragraph range: ${paragraphRange.startIndex}-${paragraphRange.endIndex}`
-      );
-    }
-
-    return paragraphRange;
+    return findParagraphInContent(res.data.body.content);
   } catch (error: unknown) {
     const message = getErrorMessage(error);
     const code = isGoogleApiError(error) ? error.code : undefined;
-    console.error(
-      `Error getting paragraph range for index ${indexWithin} in doc ${documentId}: ${message}`
-    );
     if (code === 404)
       throw new UserError(`Document not found while finding paragraph (ID: ${documentId}).`);
     if (code === 403) throw new UserError(`Permission denied while accessing doc ${documentId}.`);
@@ -461,61 +397,48 @@ export function buildUpdateParagraphStyleRequest(
   const paragraphStyle: docs_v1.Schema$ParagraphStyle = {};
   const fieldsToUpdate: string[] = [];
 
-  console.log(
-    `Building paragraph style request for range ${startIndex}-${endIndex} with options:`,
-    style
-  );
-
   // Process alignment option (LEFT, CENTER, RIGHT, JUSTIFIED)
   if (style.alignment !== undefined) {
     paragraphStyle.alignment = style.alignment;
     fieldsToUpdate.push('alignment');
-    console.log(`Setting alignment to ${style.alignment}`);
   }
 
   // Process indentation options
   if (style.indentStart !== undefined) {
     paragraphStyle.indentStart = { magnitude: style.indentStart, unit: 'PT' };
     fieldsToUpdate.push('indentStart');
-    console.log(`Setting left indent to ${style.indentStart}pt`);
   }
 
   if (style.indentEnd !== undefined) {
     paragraphStyle.indentEnd = { magnitude: style.indentEnd, unit: 'PT' };
     fieldsToUpdate.push('indentEnd');
-    console.log(`Setting right indent to ${style.indentEnd}pt`);
   }
 
   // Process spacing options
   if (style.spaceAbove !== undefined) {
     paragraphStyle.spaceAbove = { magnitude: style.spaceAbove, unit: 'PT' };
     fieldsToUpdate.push('spaceAbove');
-    console.log(`Setting space above to ${style.spaceAbove}pt`);
   }
 
   if (style.spaceBelow !== undefined) {
     paragraphStyle.spaceBelow = { magnitude: style.spaceBelow, unit: 'PT' };
     fieldsToUpdate.push('spaceBelow');
-    console.log(`Setting space below to ${style.spaceBelow}pt`);
   }
 
   // Process named style types (headings, etc.)
   if (style.namedStyleType !== undefined) {
     paragraphStyle.namedStyleType = style.namedStyleType;
     fieldsToUpdate.push('namedStyleType');
-    console.log(`Setting named style to ${style.namedStyleType}`);
   }
 
   // Process page break control
   if (style.keepWithNext !== undefined) {
     paragraphStyle.keepWithNext = style.keepWithNext;
     fieldsToUpdate.push('keepWithNext');
-    console.log(`Setting keepWithNext to ${style.keepWithNext}`);
   }
 
   // Verify we have styles to apply
   if (fieldsToUpdate.length === 0) {
-    console.warn('No paragraph styling options were provided');
     return null; // No styles to apply
   }
 
@@ -528,7 +451,6 @@ export function buildUpdateParagraphStyleRequest(
     },
   };
 
-  console.log(`Created paragraph style request with fields: ${fieldsToUpdate.join(', ')}`);
   return { request, fields: fieldsToUpdate };
 }
 
@@ -552,6 +474,197 @@ export async function createTable(
     },
   };
   return executeBatchUpdate(docs, documentId, [request]);
+}
+
+/**
+ * Find a table cell's content range by navigating the document structure
+ * @param docs - Google Docs API client
+ * @param documentId - The document ID
+ * @param tableStartIndex - The start index of the table element
+ * @param rowIndex - 0-based row index
+ * @param columnIndex - 0-based column index
+ * @returns Object with startIndex and endIndex of the cell's content, or null if not found
+ */
+export async function findTableCellRange(
+  docs: DocsClient,
+  documentId: string,
+  tableStartIndex: number,
+  rowIndex: number,
+  columnIndex: number
+): Promise<{ startIndex: number; endIndex: number } | null> {
+  const response = await docs.documents.get({ documentId });
+  const document = response.data;
+  const body = document.body;
+
+  if (!body?.content) {
+    throw new UserError('Document has no content');
+  }
+
+  // Find the table at the given start index
+  for (const element of body.content) {
+    if (element.table && element.startIndex === tableStartIndex) {
+      const table = element.table;
+      const rows = table.tableRows;
+
+      if (!rows || rows.length === 0) {
+        throw new UserError('Table has no rows');
+      }
+
+      if (rowIndex < 0 || rowIndex >= rows.length) {
+        throw new UserError(
+          `Row index ${rowIndex} out of bounds. Table has ${rows.length} rows (0-${rows.length - 1}).`
+        );
+      }
+
+      const row = rows[rowIndex];
+      const cells = row.tableCells;
+
+      if (!cells || cells.length === 0) {
+        throw new UserError(`Row ${rowIndex} has no cells`);
+      }
+
+      if (columnIndex < 0 || columnIndex >= cells.length) {
+        throw new UserError(
+          `Column index ${columnIndex} out of bounds. Row has ${cells.length} columns (0-${cells.length - 1}).`
+        );
+      }
+
+      const cell = cells[columnIndex];
+      const cellContent = cell.content;
+
+      if (!cellContent || cellContent.length === 0) {
+        throw new UserError(`Cell (${rowIndex}, ${columnIndex}) has no content`);
+      }
+
+      // Find the content range of the cell
+      // Cell content is an array of structural elements (usually paragraphs)
+      const firstElement = cellContent[0];
+      const lastElement = cellContent[cellContent.length - 1];
+
+      const startIndex = firstElement.startIndex ?? 0;
+      const endIndex = lastElement.endIndex ?? startIndex;
+
+      return { startIndex, endIndex };
+    }
+  }
+
+  throw new UserError(
+    `No table found at index ${tableStartIndex}. Use readGoogleDoc to find table locations.`
+  );
+}
+
+/**
+ * Edit the content of a specific table cell
+ * @param docs - Google Docs API client
+ * @param documentId - The document ID
+ * @param tableStartIndex - The start index of the table element
+ * @param rowIndex - 0-based row index
+ * @param columnIndex - 0-based column index
+ * @param newContent - New text content for the cell (replaces existing content)
+ * @returns Batch update response
+ */
+export async function editTableCellContent(
+  docs: DocsClient,
+  documentId: string,
+  tableStartIndex: number,
+  rowIndex: number,
+  columnIndex: number,
+  newContent: string
+): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
+  const cellRange = await findTableCellRange(
+    docs,
+    documentId,
+    tableStartIndex,
+    rowIndex,
+    columnIndex
+  );
+
+  if (!cellRange) {
+    throw new UserError(`Could not find cell at (${rowIndex}, ${columnIndex})`);
+  }
+
+  const requests: docs_v1.Schema$Request[] = [];
+
+  // Delete existing content (but leave the cell structure - delete content inside the cell)
+  // The cell always has at least one paragraph, so we need to be careful
+  // We delete from startIndex to endIndex-1 (leave the trailing newline that marks end of cell paragraph)
+  const deleteEndIndex = cellRange.endIndex - 1; // Keep the newline at the end
+  if (deleteEndIndex > cellRange.startIndex) {
+    requests.push({
+      deleteContentRange: {
+        range: {
+          startIndex: cellRange.startIndex,
+          endIndex: deleteEndIndex,
+        },
+      },
+    });
+  }
+
+  // Insert new content at the start of the cell
+  if (newContent) {
+    requests.push({
+      insertText: {
+        location: { index: cellRange.startIndex },
+        text: newContent,
+      },
+    });
+  }
+
+  if (requests.length === 0) {
+    return {}; // Nothing to do
+  }
+
+  return executeBatchUpdate(docs, documentId, requests);
+}
+
+/**
+ * Find all tables in a document and return their locations and dimensions
+ * @param docs - Google Docs API client
+ * @param documentId - The document ID
+ * @returns Array of table info objects
+ */
+export async function findDocumentTables(
+  docs: DocsClient,
+  documentId: string
+): Promise<
+  Array<{
+    startIndex: number;
+    endIndex: number;
+    rows: number;
+    columns: number;
+  }>
+> {
+  const response = await docs.documents.get({ documentId });
+  const document = response.data;
+  const body = document.body;
+
+  if (!body?.content) {
+    return [];
+  }
+
+  const tables: Array<{
+    startIndex: number;
+    endIndex: number;
+    rows: number;
+    columns: number;
+  }> = [];
+
+  for (const element of body.content) {
+    if (element.table) {
+      const table = element.table;
+      const rows = table.tableRows ?? [];
+      const columns = rows.length > 0 ? (rows[0].tableCells?.length ?? 0) : 0;
+
+      tables.push({
+        startIndex: element.startIndex ?? 0,
+        endIndex: element.endIndex ?? 0,
+        rows: rows.length,
+        columns: columns,
+      });
+    }
+  }
+
+  return tables;
 }
 
 export async function insertText(
@@ -769,42 +882,6 @@ export async function detectAndFormatLists(
   requests.reverse();
 
   return executeBatchUpdate(docs, documentId, requests);
-}
-
-export function addCommentHelper(
-  _docs: DocsClient,
-  _documentId: string,
-  _text: string,
-  _startIndex: number,
-  _endIndex: number
-): Promise<void> {
-  // NOTE: Adding comments typically requires the Google Drive API v3 and different scopes!
-  // 'https://www.googleapis.com/auth/drive' or more specific comment scopes.
-  // This helper is a placeholder assuming Drive API client (`drive`) is available and authorized.
-  /*
-const drive = google.drive({version: 'v3', auth: authClient}); // Assuming authClient is available
-await drive.comments.create({
-fileId: documentId,
-requestBody: {
-content: text,
-anchor: JSON.stringify({ // Anchor format might need verification
-'type': 'workbook#textAnchor', // Or appropriate type for Docs
-'refs': [{
-'docRevisionId': 'head', // Or specific revision
-'range': {
-'start': startIndex,
-'end': endIndex,
-}
-}]
-})
-},
-fields: 'id'
-});
-*/
-  console.warn('addCommentHelper requires Google Drive API and is not implemented.');
-  throw new NotImplementedError(
-    'Adding comments requires Drive API setup and is not yet implemented.'
-  );
 }
 
 // --- Image Insertion Helpers ---

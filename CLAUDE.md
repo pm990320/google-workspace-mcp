@@ -35,7 +35,7 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Accounts | 3 | `listAccounts`, `addAccount`, `removeAccount` |
 | Docs | 5 | `readGoogleDoc`, `appendToGoogleDoc`, `insertText`, `deleteRange`, `listDocumentTabs` |
 | Formatting | 3 | `applyTextStyle`, `applyParagraphStyle`, `formatMatchingText` |
-| Structure | 7 | `insertTable`, `insertPageBreak`, `insertImageFromUrl`, `insertLocalImage`, `editTableCell`*, `findElement`*, `fixListFormatting`* |
+| Structure | 7 | `insertTable`, `insertPageBreak`, `insertImageFromUrl`, `insertLocalImage`, `editTableCell`, `findElement`, `fixListFormatting`* |
 | Comments | 6 | `listComments`, `getComment`, `addComment`, `replyToComment`, `resolveComment`, `deleteComment` |
 | Sheets | 8 | `readSpreadsheet`, `writeSpreadsheet`, `appendSpreadsheetRows`, `clearSpreadsheetRange`, `createSpreadsheet`, `listGoogleSheets` |
 | Drive | 13 | `listGoogleDocs`, `searchGoogleDocs`, `getDocumentInfo`, `createFolder`, `moveFile`, `copyFile`, `createDocument` |
@@ -44,7 +44,7 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Slides | 5 | `listPresentations`, `readPresentation`, `createPresentation`, `addSlide`, `addTextToSlide` |
 | Forms | 5 | `listForms`, `readForm`, `getFormResponses`, `createForm`, `addFormQuestion` |
 
-*Not fully implemented
+*Experimental (may not work reliably)
 
 ## Required OAuth Scopes
 
@@ -58,11 +58,14 @@ The server requires these Google OAuth scopes:
 - `https://www.googleapis.com/auth/forms.body`
 - `https://www.googleapis.com/auth/forms.responses.readonly`
 
+## Safety Features
+
+- **No permanent deletion:** The `deleteFile` tool always moves files to trash rather than permanently deleting them. Files can be restored from trash within 30 days. This prevents accidental data loss.
+
 ## Known Limitations
 
 - **Comment anchoring:** Programmatically created comments appear in "All Comments" but aren't visibly anchored to text in the UI
 - **Resolved status:** May not persist in Google Docs UI (Drive API limitation)
-- **editTableCell:** Not implemented (complex cell index calculation)
 - **fixListFormatting:** Experimental, may not work reliably
 
 ## Parameter Patterns

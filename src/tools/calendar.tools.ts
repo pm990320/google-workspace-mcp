@@ -1,6 +1,7 @@
 // calendar.tools.ts - Auto-generated tool module
 import { z } from 'zod';
 import { type calendar_v3 } from 'googleapis';
+import { formatToolError } from '../errorHelpers.js';
 import { type FastMCPServer } from '../types.js';
 
 export function registerCalendarTools(
@@ -19,25 +20,29 @@ export function registerCalendarTools(
       account: z.string().describe('Account name to use'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      const response = await calendar.calendarList.list();
+        const response = await calendar.calendarList.list();
 
-      return JSON.stringify(
-        {
-          calendars: (response.data.items ?? []).map((c) => ({
-            id: c.id,
-            summary: c.summary,
-            description: c.description,
-            primary: c.primary,
-            accessRole: c.accessRole,
-            backgroundColor: c.backgroundColor,
-            timeZone: c.timeZone,
-          })),
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            calendars: (response.data.items ?? []).map((c) => ({
+              id: c.id,
+              summary: c.summary,
+              description: c.description,
+              primary: c.primary,
+              accessRole: c.accessRole,
+              backgroundColor: c.backgroundColor,
+              timeZone: c.timeZone,
+            })),
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listCalendars', error));
+      }
     },
   });
 
@@ -82,43 +87,129 @@ export function registerCalendarTools(
         .describe('Order by field'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      const now = new Date();
-      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const now = new Date();
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-      const response = await calendar.events.list({
-        calendarId: args.calendarId || 'primary',
-        timeMin: args.timeMin || now.toISOString(),
-        timeMax: args.timeMax || weekFromNow.toISOString(),
-        maxResults: args.maxResults,
-        singleEvents: args.singleEvents,
-        orderBy: args.singleEvents ? args.orderBy : undefined,
-      });
+        const response = await calendar.events.list({
+          calendarId: args.calendarId || 'primary',
+          timeMin: args.timeMin || now.toISOString(),
+          timeMax: args.timeMax || weekFromNow.toISOString(),
+          maxResults: args.maxResults,
+          singleEvents: args.singleEvents,
+          orderBy: args.singleEvents ? args.orderBy : undefined,
+        });
 
-      return JSON.stringify(
-        {
-          timeZone: response.data.timeZone,
-          events: (response.data.items ?? []).map((e) => ({
-            id: e.id,
-            summary: e.summary,
-            description: e.description,
-            location: e.location,
-            start: e.start,
-            end: e.end,
-            status: e.status,
-            htmlLink: e.htmlLink,
-            attendees: e.attendees?.map((a) => ({
-              email: a.email,
-              responseStatus: a.responseStatus,
+        return JSON.stringify(
+          {
+            timeZone: response.data.timeZone,
+            events: (response.data.items ?? []).map((e) => ({
+              id: e.id,
+              summary: e.summary,
+              description: e.description,
+              location: e.location,
+              start: e.start,
+              end: e.end,
+              status: e.status,
+              htmlLink: e.htmlLink,
+              attendees: e.attendees?.map((a) => ({
+                email: a.email,
+                responseStatus: a.responseStatus,
+              })),
+              organizer: e.organizer,
+              recurring: !!e.recurringEventId,
             })),
-            organizer: e.organizer,
-            recurring: !!e.recurringEventId,
-          })),
-        },
-        null,
-        2
-      );
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listCalendarEvents', error));
+      }
+    },
+  });
+
+  // --- Search Calendar Events ---
+  server.addTool({
+    name: 'searchCalendarEvents',
+    description:
+      'Search for calendar events by text query. Searches event summary, description, location, and attendee names/emails.',
+    annotations: {
+      title: 'Search Calendar Events',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      query: z.string().min(1).describe('Text to search for in events'),
+      calendarId: z
+        .string()
+        .optional()
+        .default('primary')
+        .describe('Calendar ID (default: primary)'),
+      timeMin: z
+        .string()
+        .optional()
+        .describe('Start of time range (ISO 8601 format). Defaults to 1 year ago.'),
+      timeMax: z
+        .string()
+        .optional()
+        .describe('End of time range (ISO 8601 format). Defaults to 1 year from now.'),
+      maxResults: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of events (default: 25)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const calendar = await getClient(args.account);
+
+        const now = new Date();
+        const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        const yearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+        const response = await calendar.events.list({
+          calendarId: args.calendarId || 'primary',
+          q: args.query,
+          timeMin: args.timeMin || yearAgo.toISOString(),
+          timeMax: args.timeMax || yearFromNow.toISOString(),
+          maxResults: args.maxResults,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+
+        const events = response.data.items ?? [];
+
+        return JSON.stringify(
+          {
+            query: args.query,
+            timeZone: response.data.timeZone,
+            resultsCount: events.length,
+            events: events.map((e) => ({
+              id: e.id,
+              summary: e.summary,
+              description: e.description,
+              location: e.location,
+              start: e.start,
+              end: e.end,
+              status: e.status,
+              htmlLink: e.htmlLink,
+              attendees: e.attendees?.map((a) => ({
+                email: a.email,
+                responseStatus: a.responseStatus,
+              })),
+              organizer: e.organizer,
+            })),
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('searchCalendarEvents', error));
+      }
     },
   });
 
@@ -137,36 +228,40 @@ export function registerCalendarTools(
       eventId: z.string().describe('Event ID to retrieve'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      const response = await calendar.events.get({
-        calendarId: args.calendarId || 'primary',
-        eventId: args.eventId,
-      });
+        const response = await calendar.events.get({
+          calendarId: args.calendarId || 'primary',
+          eventId: args.eventId,
+        });
 
-      const e = response.data;
-      return JSON.stringify(
-        {
-          id: e.id,
-          summary: e.summary,
-          description: e.description,
-          location: e.location,
-          start: e.start,
-          end: e.end,
-          status: e.status,
-          htmlLink: e.htmlLink,
-          attendees: e.attendees,
-          organizer: e.organizer,
-          creator: e.creator,
-          created: e.created,
-          updated: e.updated,
-          recurrence: e.recurrence,
-          reminders: e.reminders,
-          conferenceData: e.conferenceData,
-        },
-        null,
-        2
-      );
+        const e = response.data;
+        return JSON.stringify(
+          {
+            id: e.id,
+            summary: e.summary,
+            description: e.description,
+            location: e.location,
+            start: e.start,
+            end: e.end,
+            status: e.status,
+            htmlLink: e.htmlLink,
+            attendees: e.attendees,
+            organizer: e.organizer,
+            creator: e.creator,
+            created: e.created,
+            updated: e.updated,
+            recurrence: e.recurrence,
+            reminders: e.reminders,
+            conferenceData: e.conferenceData,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('getCalendarEvent', error));
+      }
     },
   });
 
@@ -200,39 +295,43 @@ export function registerCalendarTools(
         .describe('Send notifications to attendees'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      const response = await calendar.events.insert({
-        calendarId: args.calendarId || 'primary',
-        sendUpdates: args.sendUpdates,
-        requestBody: {
-          summary: args.summary,
-          description: args.description,
-          location: args.location,
-          start: {
-            dateTime: args.startDateTime,
-            timeZone: args.timeZone,
+        const response = await calendar.events.insert({
+          calendarId: args.calendarId || 'primary',
+          sendUpdates: args.sendUpdates,
+          requestBody: {
+            summary: args.summary,
+            description: args.description,
+            location: args.location,
+            start: {
+              dateTime: args.startDateTime,
+              timeZone: args.timeZone,
+            },
+            end: {
+              dateTime: args.endDateTime,
+              timeZone: args.timeZone,
+            },
+            attendees: args.attendees?.map((email) => ({ email })),
           },
-          end: {
-            dateTime: args.endDateTime,
-            timeZone: args.timeZone,
-          },
-          attendees: args.attendees?.map((email) => ({ email })),
-        },
-      });
+        });
 
-      return JSON.stringify(
-        {
-          success: true,
-          eventId: response.data.id,
-          htmlLink: response.data.htmlLink,
-          summary: response.data.summary,
-          start: response.data.start,
-          end: response.data.end,
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            success: true,
+            eventId: response.data.id,
+            htmlLink: response.data.htmlLink,
+            summary: response.data.summary,
+            start: response.data.start,
+            end: response.data.end,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('createCalendarEvent', error));
+      }
     },
   });
 
@@ -264,47 +363,51 @@ export function registerCalendarTools(
         .describe('Send update notifications'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      // First get the existing event
-      const existing = await calendar.events.get({
-        calendarId: args.calendarId || 'primary',
-        eventId: args.eventId,
-      });
+        // First get the existing event
+        const existing = await calendar.events.get({
+          calendarId: args.calendarId || 'primary',
+          eventId: args.eventId,
+        });
 
-      // Merge updates
-      const updated = {
-        ...existing.data,
-        summary: args.summary ?? existing.data.summary,
-        description: args.description ?? existing.data.description,
-        location: args.location ?? existing.data.location,
-        start: args.startDateTime
-          ? { dateTime: args.startDateTime, timeZone: args.timeZone }
-          : existing.data.start,
-        end: args.endDateTime
-          ? { dateTime: args.endDateTime, timeZone: args.timeZone }
-          : existing.data.end,
-      };
+        // Merge updates
+        const updated = {
+          ...existing.data,
+          summary: args.summary ?? existing.data.summary,
+          description: args.description ?? existing.data.description,
+          location: args.location ?? existing.data.location,
+          start: args.startDateTime
+            ? { dateTime: args.startDateTime, timeZone: args.timeZone }
+            : existing.data.start,
+          end: args.endDateTime
+            ? { dateTime: args.endDateTime, timeZone: args.timeZone }
+            : existing.data.end,
+        };
 
-      const response = await calendar.events.update({
-        calendarId: args.calendarId || 'primary',
-        eventId: args.eventId,
-        sendUpdates: args.sendUpdates,
-        requestBody: updated,
-      });
+        const response = await calendar.events.update({
+          calendarId: args.calendarId || 'primary',
+          eventId: args.eventId,
+          sendUpdates: args.sendUpdates,
+          requestBody: updated,
+        });
 
-      return JSON.stringify(
-        {
-          success: true,
-          eventId: response.data.id,
-          htmlLink: response.data.htmlLink,
-          summary: response.data.summary,
-          start: response.data.start,
-          end: response.data.end,
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            success: true,
+            eventId: response.data.id,
+            htmlLink: response.data.htmlLink,
+            summary: response.data.summary,
+            start: response.data.start,
+            end: response.data.end,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('updateCalendarEvent', error));
+      }
     },
   });
 
@@ -330,15 +433,19 @@ export function registerCalendarTools(
         .describe('Send cancellation notifications'),
     }),
     async execute(args, { log: _log }) {
-      const calendar = await getClient(args.account);
+      try {
+        const calendar = await getClient(args.account);
 
-      await calendar.events.delete({
-        calendarId: args.calendarId || 'primary',
-        eventId: args.eventId,
-        sendUpdates: args.sendUpdates,
-      });
+        await calendar.events.delete({
+          calendarId: args.calendarId || 'primary',
+          eventId: args.eventId,
+          sendUpdates: args.sendUpdates,
+        });
 
-      return JSON.stringify({ success: true, deletedEventId: args.eventId }, null, 2);
+        return JSON.stringify({ success: true, deletedEventId: args.eventId }, null, 2);
+      } catch (error: unknown) {
+        throw new Error(formatToolError('deleteCalendarEvent', error));
+      }
     },
   });
 }

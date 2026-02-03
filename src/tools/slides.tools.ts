@@ -10,7 +10,7 @@ export function registerSlidesTools(
 ) {
   server.addTool({
     name: 'listPresentations',
-    description: 'List Google Slides presentations in Drive.',
+    description: 'List Google Slides presentations in Drive with optional search.',
     annotations: {
       title: 'List Presentations',
       readOnlyHint: true,
@@ -19,13 +19,28 @@ export function registerSlidesTools(
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
+      query: z
+        .string()
+        .optional()
+        .describe('Search query to filter presentations by name or content.'),
+      orderBy: z
+        .enum(['name', 'modifiedTime', 'createdTime'])
+        .optional()
+        .default('modifiedTime')
+        .describe('Sort order for results.'),
     }),
     async execute(args, { log: _log }) {
       const drive = await getDrive(args.account);
 
+      let queryString = "mimeType='application/vnd.google-apps.presentation' and trashed=false";
+      if (args.query) {
+        queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+      }
+
       const response = await drive.files.list({
-        q: "mimeType='application/vnd.google-apps.presentation'",
+        q: queryString,
         pageSize: args.maxResults,
+        orderBy: args.orderBy === 'name' ? 'name' : args.orderBy,
         fields: 'files(id, name, createdTime, modifiedTime, owners, webViewLink)',
       });
 

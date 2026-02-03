@@ -10,7 +10,7 @@ export function registerFormsTools(
 ) {
   server.addTool({
     name: 'listForms',
-    description: 'List Google Forms in Drive.',
+    description: 'List Google Forms in Drive with optional search.',
     annotations: {
       title: 'List Forms',
       readOnlyHint: true,
@@ -19,13 +19,25 @@ export function registerFormsTools(
     parameters: z.object({
       account: z.string().describe('Account name to use'),
       maxResults: z.number().optional().default(20).describe('Maximum results (default: 20)'),
+      query: z.string().optional().describe('Search query to filter forms by name or content.'),
+      orderBy: z
+        .enum(['name', 'modifiedTime', 'createdTime'])
+        .optional()
+        .default('modifiedTime')
+        .describe('Sort order for results.'),
     }),
     async execute(args, { log: _log }) {
       const drive = await getDrive(args.account);
 
+      let queryString = "mimeType='application/vnd.google-apps.form' and trashed=false";
+      if (args.query) {
+        queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+      }
+
       const response = await drive.files.list({
-        q: "mimeType='application/vnd.google-apps.form'",
+        q: queryString,
         pageSize: args.maxResults,
+        orderBy: args.orderBy === 'name' ? 'name' : args.orderBy,
         fields: 'files(id, name, createdTime, modifiedTime, owners, webViewLink)',
       });
 

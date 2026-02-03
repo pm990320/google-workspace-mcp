@@ -428,4 +428,45 @@ export async function formatCells(
   }
 }
 
+/**
+ * Deletes a sheet/tab from a spreadsheet
+ */
+export async function deleteSheet(
+  sheets: SheetsClient,
+  spreadsheetId: string,
+  sheetId: number
+): Promise<sheets_v4.Schema$BatchUpdateSpreadsheetResponse> {
+  try {
+    const response = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteSheet: {
+              sheetId,
+            },
+          },
+        ],
+      },
+    });
+    return response.data;
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
+      throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
+    }
+    if (code === 403) {
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
+    }
+    if (code === 400) {
+      throw new UserError(
+        'Cannot delete the last sheet in a spreadsheet. A spreadsheet must have at least one sheet.'
+      );
+    }
+    throw new UserError(`Failed to delete sheet: ${getErrorMessage(error)}`);
+  }
+}
+
 // Note: hexToRgbColor is available from '../types.js' if needed for color conversions

@@ -1,7 +1,7 @@
 // gmail.tools.ts - Auto-generated tool module
 import { z } from 'zod';
 import { type gmail_v1 } from 'googleapis';
-import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
+import { formatToolError } from '../errorHelpers.js';
 import { type FastMCPServer, type MessagePart } from '../types.js';
 
 export function registerGmailTools(
@@ -57,10 +57,7 @@ export function registerGmailTools(
           2
         );
       } catch (error: unknown) {
-        const message = getErrorMessage(error);
-        const code = isGoogleApiError(error) ? error.code : undefined;
-        console.error('[listGmailMessages] Error:', message);
-        throw new Error(`Gmail API error: ${message}. Code: ${code || 'unknown'}`);
+        throw new Error(formatToolError('listGmailMessages', error));
       }
     },
   });
@@ -85,91 +82,95 @@ export function registerGmailTools(
         .describe('Response format'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      const response = await gmail.users.messages.get({
-        userId: 'me',
-        id: args.messageId,
-        format: args.format,
-      });
+        const response = await gmail.users.messages.get({
+          userId: 'me',
+          id: args.messageId,
+          format: args.format,
+        });
 
-      const message = response.data;
-      const headers = message.payload?.headers ?? [];
+        const message = response.data;
+        const headers = message.payload?.headers ?? [];
 
-      // Extract common headers
-      const getHeader = (name: string) =>
-        headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+        // Extract common headers
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
 
-      // Extract body
-      let body = '';
-      const extractBody = (part: MessagePart): string => {
-        if (part.body?.data) {
-          return Buffer.from(part.body.data, 'base64').toString('utf8');
-        }
-        if (part.parts) {
-          for (const subpart of part.parts) {
-            if (subpart.mimeType === 'text/plain') {
-              return extractBody(subpart);
+        // Extract body
+        let body = '';
+        const extractBody = (part: MessagePart): string => {
+          if (part.body?.data) {
+            return Buffer.from(part.body.data, 'base64').toString('utf8');
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/plain') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/html') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              const result = extractBody(subpart);
+              if (result) return result;
             }
           }
-          for (const subpart of part.parts) {
-            if (subpart.mimeType === 'text/html') {
-              return extractBody(subpart);
-            }
+          return '';
+        };
+
+        if (message.payload) {
+          body = extractBody(message.payload);
+        }
+
+        // Extract attachments info
+        const attachments: {
+          filename: string;
+          mimeType: string;
+          size: number;
+          attachmentId: string;
+        }[] = [];
+        const extractAttachments = (part: MessagePart) => {
+          if (part.filename && part.body?.attachmentId) {
+            attachments.push({
+              filename: part.filename,
+              mimeType: part.mimeType || 'application/octet-stream',
+              size: part.body.size || 0,
+              attachmentId: part.body.attachmentId,
+            });
           }
-          for (const subpart of part.parts) {
-            const result = extractBody(subpart);
-            if (result) return result;
+          if (part.parts) {
+            part.parts.forEach(extractAttachments);
           }
+        };
+        if (message.payload) {
+          extractAttachments(message.payload);
         }
-        return '';
-      };
 
-      if (message.payload) {
-        body = extractBody(message.payload);
+        return JSON.stringify(
+          {
+            id: message.id,
+            threadId: message.threadId,
+            labelIds: message.labelIds,
+            snippet: message.snippet,
+            from: getHeader('From'),
+            to: getHeader('To'),
+            cc: getHeader('Cc'),
+            subject: getHeader('Subject'),
+            date: getHeader('Date'),
+            body,
+            attachments,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('readGmailMessage', error));
       }
-
-      // Extract attachments info
-      const attachments: {
-        filename: string;
-        mimeType: string;
-        size: number;
-        attachmentId: string;
-      }[] = [];
-      const extractAttachments = (part: MessagePart) => {
-        if (part.filename && part.body?.attachmentId) {
-          attachments.push({
-            filename: part.filename,
-            mimeType: part.mimeType || 'application/octet-stream',
-            size: part.body.size || 0,
-            attachmentId: part.body.attachmentId,
-          });
-        }
-        if (part.parts) {
-          part.parts.forEach(extractAttachments);
-        }
-      };
-      if (message.payload) {
-        extractAttachments(message.payload);
-      }
-
-      return JSON.stringify(
-        {
-          id: message.id,
-          threadId: message.threadId,
-          labelIds: message.labelIds,
-          snippet: message.snippet,
-          from: getHeader('From'),
-          to: getHeader('To'),
-          cc: getHeader('Cc'),
-          subject: getHeader('Subject'),
-          date: getHeader('Date'),
-          body,
-          attachments,
-        },
-        null,
-        2
-      );
     },
   });
 
@@ -199,53 +200,57 @@ export function registerGmailTools(
       replyToMessageId: z.string().optional().describe('Message ID to reply to (for threading)'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      // Build the email
-      let email = '';
+        // Build the email
+        let email = '';
 
-      email += `To: ${args.to}\r\n`;
-      if (args.cc) email += `Cc: ${args.cc}\r\n`;
-      if (args.bcc) email += `Bcc: ${args.bcc}\r\n`;
-      email += `Subject: ${args.subject}\r\n`;
-      email += 'MIME-Version: 1.0\r\n';
+        email += `To: ${args.to}\r\n`;
+        if (args.cc) email += `Cc: ${args.cc}\r\n`;
+        if (args.bcc) email += `Bcc: ${args.bcc}\r\n`;
+        email += `Subject: ${args.subject}\r\n`;
+        email += 'MIME-Version: 1.0\r\n';
 
-      if (args.isHtml) {
-        email += 'Content-Type: text/html; charset=utf-8\r\n';
-      } else {
-        email += 'Content-Type: text/plain; charset=utf-8\r\n';
+        if (args.isHtml) {
+          email += 'Content-Type: text/html; charset=utf-8\r\n';
+        } else {
+          email += 'Content-Type: text/plain; charset=utf-8\r\n';
+        }
+
+        email += `\r\n${args.body}`;
+
+        // Base64 encode the email
+        const encodedEmail = Buffer.from(email)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        const response = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw: encodedEmail,
+            threadId: args.replyToMessageId
+              ? (await gmail.users.messages.get({ userId: 'me', id: args.replyToMessageId })).data
+                  .threadId
+              : undefined,
+          },
+        });
+
+        return JSON.stringify(
+          {
+            success: true,
+            messageId: response.data.id,
+            threadId: response.data.threadId,
+            labelIds: response.data.labelIds,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('sendGmailMessage', error));
       }
-
-      email += `\r\n${args.body}`;
-
-      // Base64 encode the email
-      const encodedEmail = Buffer.from(email)
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-
-      const response = await gmail.users.messages.send({
-        userId: 'me',
-        requestBody: {
-          raw: encodedEmail,
-          threadId: args.replyToMessageId
-            ? (await gmail.users.messages.get({ userId: 'me', id: args.replyToMessageId })).data
-                .threadId
-            : undefined,
-        },
-      });
-
-      return JSON.stringify(
-        {
-          success: true,
-          messageId: response.data.id,
-          threadId: response.data.threadId,
-          labelIds: response.data.labelIds,
-        },
-        null,
-        2
-      );
     },
   });
 
@@ -272,54 +277,58 @@ export function registerGmailTools(
         .describe('Maximum results to return (default: 20)'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      const listResponse = await gmail.users.messages.list({
-        userId: 'me',
-        q: args.query,
-        maxResults: Math.min(args.maxResults || 20, 100),
-      });
+        const listResponse = await gmail.users.messages.list({
+          userId: 'me',
+          q: args.query,
+          maxResults: Math.min(args.maxResults || 20, 100),
+        });
 
-      const messages = listResponse.data.messages ?? [];
+        const messages = listResponse.data.messages ?? [];
 
-      // Get snippets for each message (filter ensures m.id is defined)
-      const messagesWithIds = messages
-        .slice(0, 20)
-        .filter((m): m is typeof m & { id: string } => Boolean(m.id));
-      const results = await Promise.all(
-        messagesWithIds.map(async (m) => {
-          const msg = await gmail.users.messages.get({
-            userId: 'me',
-            id: m.id,
-            format: 'metadata',
-            metadataHeaders: ['From', 'Subject', 'Date'],
-          });
-          const headers = msg.data.payload?.headers ?? [];
-          const getHeader = (name: string) => headers.find((h) => h.name === name)?.value;
-          return JSON.stringify(
-            {
-              id: msg.data.id,
-              threadId: msg.data.threadId,
-              snippet: msg.data.snippet,
-              from: getHeader('From'),
-              subject: getHeader('Subject'),
-              date: getHeader('Date'),
-              labelIds: msg.data.labelIds,
-            },
-            null,
-            2
-          );
-        })
-      );
+        // Get snippets for each message (filter ensures m.id is defined)
+        const messagesWithIds = messages
+          .slice(0, 20)
+          .filter((m): m is typeof m & { id: string } => Boolean(m.id));
+        const results = await Promise.all(
+          messagesWithIds.map(async (m) => {
+            const msg = await gmail.users.messages.get({
+              userId: 'me',
+              id: m.id,
+              format: 'metadata',
+              metadataHeaders: ['From', 'Subject', 'Date'],
+            });
+            const headers = msg.data.payload?.headers ?? [];
+            const getHeader = (name: string) => headers.find((h) => h.name === name)?.value;
+            return JSON.stringify(
+              {
+                id: msg.data.id,
+                threadId: msg.data.threadId,
+                snippet: msg.data.snippet,
+                from: getHeader('From'),
+                subject: getHeader('Subject'),
+                date: getHeader('Date'),
+                labelIds: msg.data.labelIds,
+              },
+              null,
+              2
+            );
+          })
+        );
 
-      return JSON.stringify(
-        {
-          totalEstimate: listResponse.data.resultSizeEstimate,
-          results,
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            totalEstimate: listResponse.data.resultSizeEstimate,
+            results,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('searchGmail', error));
+      }
     },
   });
 
@@ -336,23 +345,27 @@ export function registerGmailTools(
       account: z.string().describe('Account name to use'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      const response = await gmail.users.labels.list({ userId: 'me' });
+        const response = await gmail.users.labels.list({ userId: 'me' });
 
-      return JSON.stringify(
-        {
-          labels: (response.data.labels ?? []).map((l) => ({
-            id: l.id,
-            name: l.name,
-            type: l.type,
-            messagesTotal: l.messagesTotal,
-            messagesUnread: l.messagesUnread,
-          })),
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            labels: (response.data.labels ?? []).map((l) => ({
+              id: l.id,
+              name: l.name,
+              type: l.type,
+              messagesTotal: l.messagesTotal,
+              messagesUnread: l.messagesUnread,
+            })),
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listGmailLabels', error));
+      }
     },
   });
 
@@ -381,26 +394,30 @@ export function registerGmailTools(
         .describe('Label IDs to remove (e.g., ["UNREAD", "INBOX"])'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      const response = await gmail.users.messages.modify({
-        userId: 'me',
-        id: args.messageId,
-        requestBody: {
-          addLabelIds: args.addLabelIds,
-          removeLabelIds: args.removeLabelIds,
-        },
-      });
+        const response = await gmail.users.messages.modify({
+          userId: 'me',
+          id: args.messageId,
+          requestBody: {
+            addLabelIds: args.addLabelIds,
+            removeLabelIds: args.removeLabelIds,
+          },
+        });
 
-      return JSON.stringify(
-        {
-          success: true,
-          messageId: response.data.id,
-          labelIds: response.data.labelIds,
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            success: true,
+            messageId: response.data.id,
+            labelIds: response.data.labelIds,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('modifyGmailLabels', error));
+      }
     },
   });
 
@@ -424,44 +441,49 @@ export function registerGmailTools(
       isHtml: z.boolean().optional().default(false).describe('Whether body is HTML'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      let email = '';
-      email += `To: ${args.to}\r\n`;
-      if (args.cc) email += `Cc: ${args.cc}\r\n`;
-      email += `Subject: ${args.subject}\r\n`;
-      email += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
-      email += `\r\n${args.body}`;
+        let email = '';
+        email += `To: ${args.to}\r\n`;
+        if (args.cc) email += `Cc: ${args.cc}\r\n`;
+        email += `Subject: ${args.subject}\r\n`;
+        email += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+        email += `\r\n${args.body}`;
 
-      const encodedEmail = Buffer.from(email)
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+        const encodedEmail = Buffer.from(email)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
 
-      const response = await gmail.users.drafts.create({
-        userId: 'me',
-        requestBody: {
-          message: { raw: encodedEmail },
-        },
-      });
+        const response = await gmail.users.drafts.create({
+          userId: 'me',
+          requestBody: {
+            message: { raw: encodedEmail },
+          },
+        });
 
-      return JSON.stringify(
-        {
-          success: true,
-          draftId: response.data.id,
-          messageId: response.data.message?.id,
-        },
-        null,
-        2
-      );
+        return JSON.stringify(
+          {
+            success: true,
+            draftId: response.data.id,
+            messageId: response.data.message?.id,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('createGmailDraft', error));
+      }
     },
   });
 
   // --- Delete Gmail Message ---
   server.addTool({
     name: 'deleteGmailMessage',
-    description: 'Move a Gmail message to trash or permanently delete it.',
+    description:
+      'Move a Gmail message to trash. Messages in trash are automatically deleted after 30 days.',
     annotations: {
       title: 'Delete Gmail Message',
       readOnlyHint: false,
@@ -471,27 +493,12 @@ export function registerGmailTools(
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      messageId: z.string().describe('The message ID to delete'),
-      permanent: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe('If true, permanently delete (cannot be recovered). Default moves to trash.'),
+      messageId: z.string().describe('The message ID to move to trash'),
     }),
     async execute(args, { log: _log }) {
-      const gmail = await getClient(args.account);
+      try {
+        const gmail = await getClient(args.account);
 
-      if (args.permanent) {
-        await gmail.users.messages.delete({
-          userId: 'me',
-          id: args.messageId,
-        });
-        return JSON.stringify(
-          { success: true, action: 'permanently_deleted', messageId: args.messageId },
-          null,
-          2
-        );
-      } else {
         await gmail.users.messages.trash({
           userId: 'me',
           id: args.messageId,
@@ -501,6 +508,8 @@ export function registerGmailTools(
           null,
           2
         );
+      } catch (error: unknown) {
+        throw new Error(formatToolError('deleteGmailMessage', error));
       }
     },
   });

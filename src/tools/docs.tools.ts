@@ -1109,13 +1109,75 @@ export function registerDocsTools(
       ),
     }),
     execute: async (args, { log }) => {
-      await getDocsClient(args.account);
+      const docs = await getDocsClient(args.account);
       log.info(
         `Editing cell (${args.rowIndex}, ${args.columnIndex}) in table starting at ${args.tableStartIndex}, doc ${args.documentId}`
       );
 
-      log.error('editTableCell is not implemented due to complexity of finding cell indices.');
-      throw new NotImplementedError('Editing table cells is complex and not yet implemented.');
+      try {
+        // If textContent is provided, update the cell content
+        if (args.textContent !== undefined) {
+          await GDocsHelpers.editTableCellContent(
+            docs,
+            args.documentId,
+            args.tableStartIndex,
+            args.rowIndex,
+            args.columnIndex,
+            args.textContent
+          );
+        }
+
+        // If text or paragraph styles are provided, apply them to the cell content
+        if (args.textStyle || args.paragraphStyle) {
+          // Get the updated cell range after content edit
+          const cellRange = await GDocsHelpers.findTableCellRange(
+            docs,
+            args.documentId,
+            args.tableStartIndex,
+            args.rowIndex,
+            args.columnIndex
+          );
+
+          if (cellRange) {
+            const requests: docs_v1.Schema$Request[] = [];
+
+            // Apply text style if provided
+            if (args.textStyle) {
+              const styleRequest = GDocsHelpers.buildUpdateTextStyleRequest(
+                cellRange.startIndex,
+                cellRange.endIndex - 1, // Exclude trailing newline
+                args.textStyle as TextStyleArgs
+              );
+              if (styleRequest) {
+                requests.push(styleRequest.request);
+              }
+            }
+
+            // Apply paragraph style if provided
+            if (args.paragraphStyle) {
+              const paraRequest = GDocsHelpers.buildUpdateParagraphStyleRequest(
+                cellRange.startIndex,
+                cellRange.endIndex,
+                args.paragraphStyle
+              );
+              if (paraRequest) {
+                requests.push(paraRequest.request);
+              }
+            }
+
+            if (requests.length > 0) {
+              await GDocsHelpers.executeBatchUpdate(docs, args.documentId, requests);
+            }
+          }
+        }
+
+        return `Successfully edited cell (${args.rowIndex}, ${args.columnIndex}) in table at index ${args.tableStartIndex}.`;
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error editing table cell in doc ${args.documentId}: ${message}`);
+        if (error instanceof UserError) throw error;
+        throw new UserError(`Failed to edit table cell: ${message}`);
+      }
     },
   });
 
@@ -1705,21 +1767,196 @@ export function registerDocsTools(
   server.addTool({
     name: 'findElement',
     description:
-      'Finds elements (paragraphs, tables, etc.) based on various criteria. (Not Implemented)',
+      'Finds elements (paragraphs, tables, images, lists) in a document. Returns indices and basic info about matching elements.',
     annotations: {
       title: 'Find Element',
       readOnlyHint: true,
       openWorldHint: true,
     },
     parameters: AccountDocumentParameters.extend({
-      // Define complex query parameters...
-      textQuery: z.string().optional(),
-      elementType: z.enum(['paragraph', 'table', 'list', 'image']).optional(),
-      // styleQuery...
+      textQuery: z
+        .string()
+        .optional()
+        .describe('Search for elements containing this text (case-insensitive)'),
+      elementType: z
+        .enum(['paragraph', 'table', 'list', 'image', 'all'])
+        .optional()
+        .default('all')
+        .describe('Type of element to find'),
+      maxResults: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(20)
+        .describe('Maximum number of results to return'),
     }),
-    execute: (_args, { log }) => {
-      log.warn('findElement tool called but is not implemented.');
-      throw new NotImplementedError('Finding elements by complex criteria is not yet implemented.');
+    execute: async (args, { log }) => {
+      const docs = await getDocsClient(args.account);
+      log.info(
+        `Finding elements in doc ${args.documentId}: type=${args.elementType}, textQuery=${args.textQuery}`
+      );
+
+      try {
+        const response = await docs.documents.get({ documentId: args.documentId });
+        const document = response.data;
+        const body = document.body;
+
+        if (!body?.content) {
+          return JSON.stringify({ elements: [], message: 'Document has no content' }, null, 2);
+        }
+
+        interface FoundElement {
+          type: string;
+          startIndex: number;
+          endIndex: number;
+          text?: string;
+          rows?: number;
+          columns?: number;
+          listType?: string;
+          imageUri?: string;
+        }
+
+        const elements: FoundElement[] = [];
+        const textQueryLower = args.textQuery?.toLowerCase();
+        const maxResults = args.maxResults ?? 20;
+
+        // Helper to extract text from a paragraph
+        const getParagraphText = (paragraph: Paragraph): string => {
+          let text = '';
+          if (paragraph.elements) {
+            for (const element of paragraph.elements) {
+              if (element.textRun?.content) {
+                text += element.textRun.content;
+              }
+            }
+          }
+          return text;
+        };
+
+        // Helper to check if text matches query
+        const textMatches = (text: string): boolean => {
+          if (!textQueryLower) return true;
+          return text.toLowerCase().includes(textQueryLower);
+        };
+
+        for (const element of body.content) {
+          if (elements.length >= maxResults) break;
+
+          // Find paragraphs
+          if (
+            element.paragraph &&
+            (args.elementType === 'all' || args.elementType === 'paragraph')
+          ) {
+            const text = getParagraphText(element.paragraph);
+            if (textMatches(text)) {
+              // Check if it's a list item
+              const isListItem = !!element.paragraph.bullet;
+              if (isListItem && args.elementType === 'paragraph') {
+                // Skip list items when looking for paragraphs specifically
+                continue;
+              }
+              elements.push({
+                type: isListItem ? 'list_item' : 'paragraph',
+                startIndex: element.startIndex ?? 0,
+                endIndex: element.endIndex ?? 0,
+                text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+              });
+            }
+          }
+
+          // Find list items
+          if (
+            element.paragraph?.bullet &&
+            (args.elementType === 'all' || args.elementType === 'list')
+          ) {
+            const text = getParagraphText(element.paragraph);
+            if (textMatches(text)) {
+              elements.push({
+                type: 'list_item',
+                startIndex: element.startIndex ?? 0,
+                endIndex: element.endIndex ?? 0,
+                text: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
+                listType:
+                  element.paragraph.bullet.nestingLevel !== undefined ? 'nested' : 'top-level',
+              });
+            }
+          }
+
+          // Find tables
+          if (element.table && (args.elementType === 'all' || args.elementType === 'table')) {
+            const table = element.table;
+            const rows = table.tableRows ?? [];
+            const columns = rows.length > 0 ? (rows[0].tableCells?.length ?? 0) : 0;
+
+            // Extract text from all cells for text query matching
+            let tableText = '';
+            for (const row of rows) {
+              for (const cell of row.tableCells ?? []) {
+                for (const content of cell.content ?? []) {
+                  if (content.paragraph) {
+                    tableText += getParagraphText(content.paragraph) + ' ';
+                  }
+                }
+              }
+            }
+
+            if (textMatches(tableText)) {
+              elements.push({
+                type: 'table',
+                startIndex: element.startIndex ?? 0,
+                endIndex: element.endIndex ?? 0,
+                rows: rows.length,
+                columns: columns,
+              });
+            }
+          }
+
+          // Find images (inline objects)
+          // Note: Images in Google Docs are typically inlineObjectElements within paragraphs
+        }
+
+        // Also search for inline images within paragraphs
+        if (args.elementType === 'all' || args.elementType === 'image') {
+          for (const element of body.content) {
+            if (elements.length >= maxResults) break;
+
+            if (element.paragraph?.elements) {
+              for (const paraElement of element.paragraph.elements) {
+                if (paraElement.inlineObjectElement?.inlineObjectId) {
+                  const objectId = paraElement.inlineObjectElement.inlineObjectId;
+                  const inlineObject = document.inlineObjects?.[objectId];
+                  const imageProps =
+                    inlineObject?.inlineObjectProperties?.embeddedObject?.imageProperties;
+
+                  elements.push({
+                    type: 'image',
+                    startIndex: paraElement.startIndex ?? 0,
+                    endIndex: paraElement.endIndex ?? 0,
+                    imageUri: imageProps?.contentUri ?? 'embedded image',
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        return JSON.stringify(
+          {
+            documentTitle: document.title,
+            totalFound: elements.length,
+            elements: elements,
+          },
+          null,
+          2
+        );
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error finding elements in doc ${args.documentId}: ${message}`);
+        if (error instanceof UserError) throw error;
+        throw new UserError(`Failed to find elements: ${message}`);
+      }
     },
   });
 

@@ -805,7 +805,8 @@ export function registerDriveTools(
   // --- Delete File ---
   server.addTool({
     name: 'deleteFile',
-    description: 'Permanently deletes a file or folder from Google Drive.',
+    description:
+      'Moves a file or folder to trash in Google Drive. Files can be restored from trash within 30 days.',
     annotations: {
       title: 'Delete File',
       readOnlyHint: false,
@@ -820,18 +821,11 @@ export function registerDriveTools(
         .describe(
           'The name of the Google account to use. Use listAccounts to see available accounts.'
         ),
-      fileId: z.string().describe('ID of the file or folder to delete.'),
-      skipTrash: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe(
-          'If true, permanently deletes the file. If false, moves to trash (can be restored).'
-        ),
+      fileId: z.string().describe('ID of the file or folder to move to trash.'),
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
-      log.info(`Deleting file ${args.fileId} ${args.skipTrash ? '(permanent)' : '(to trash)'}`);
+      log.info(`Moving file ${args.fileId} to trash`);
 
       try {
         const fileInfo = await drive.files.get({
@@ -842,20 +836,13 @@ export function registerDriveTools(
         const fileName = fileInfo.data.name;
         const isFolder = fileInfo.data.mimeType === 'application/vnd.google-apps.folder';
 
-        if (args.skipTrash) {
-          await drive.files.delete({
-            fileId: args.fileId,
-          });
-          return `Permanently deleted ${isFolder ? 'folder' : 'file'} "${fileName}".`;
-        } else {
-          await drive.files.update({
-            fileId: args.fileId,
-            requestBody: {
-              trashed: true,
-            },
-          });
-          return `Moved ${isFolder ? 'folder' : 'file'} "${fileName}" to trash. It can be restored from the trash.`;
-        }
+        await drive.files.update({
+          fileId: args.fileId,
+          requestBody: {
+            trashed: true,
+          },
+        });
+        return `Moved ${isFolder ? 'folder' : 'file'} "${fileName}" to trash. It can be restored from trash within 30 days.`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
         log.error(`Error deleting file: ${message}`);

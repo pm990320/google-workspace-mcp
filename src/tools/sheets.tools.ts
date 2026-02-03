@@ -412,6 +412,91 @@ export function registerSheetsTools(
     },
   });
 
+  // --- Delete Spreadsheet Sheet ---
+  server.addTool({
+    name: 'deleteSpreadsheetSheet',
+    description:
+      'Deletes a sheet/tab from an existing Google Spreadsheet. Cannot delete the last sheet.',
+    annotations: {
+      title: 'Delete Spreadsheet Sheet',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      spreadsheetId: z.string().describe('The ID of the Google Spreadsheet (from the URL).'),
+      sheetId: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          'The numeric ID of the sheet to delete. Use getSpreadsheetInfo to find sheet IDs.'
+        ),
+      sheetTitle: z
+        .string()
+        .optional()
+        .describe(
+          'The title/name of the sheet to delete. Either sheetId or sheetTitle must be provided.'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const sheets = await getSheetsClient(args.account);
+
+      if (args.sheetId === undefined && !args.sheetTitle) {
+        throw new UserError('Either sheetId or sheetTitle must be provided.');
+      }
+
+      log.info(
+        `Deleting sheet from spreadsheet ${args.spreadsheetId} (sheetId: ${args.sheetId}, title: ${args.sheetTitle})`
+      );
+
+      try {
+        let sheetIdToDelete: number;
+        let sheetTitleDeleted: string;
+
+        if (args.sheetId !== undefined) {
+          // Verify sheet exists and get its title
+          const metadata = await SheetsHelpers.getSpreadsheetMetadata(sheets, args.spreadsheetId);
+          const sheet = metadata.sheets?.find((s) => s.properties?.sheetId === args.sheetId);
+          if (!sheet) {
+            throw new UserError(
+              `Sheet with ID ${args.sheetId} not found in spreadsheet. Use getSpreadsheetInfo to see available sheets.`
+            );
+          }
+          sheetIdToDelete = args.sheetId;
+          sheetTitleDeleted = sheet.properties?.title || 'Unknown';
+        } else {
+          // Find sheet by title
+          const metadata = await SheetsHelpers.getSpreadsheetMetadata(sheets, args.spreadsheetId);
+          const sheet = metadata.sheets?.find((s) => s.properties?.title === args.sheetTitle);
+          if (!sheet?.properties?.sheetId) {
+            throw new UserError(
+              `Sheet "${args.sheetTitle}" not found in spreadsheet. Use getSpreadsheetInfo to see available sheets.`
+            );
+          }
+          sheetIdToDelete = sheet.properties.sheetId;
+          sheetTitleDeleted = args.sheetTitle!;
+        }
+
+        await SheetsHelpers.deleteSheet(sheets, args.spreadsheetId, sheetIdToDelete);
+
+        return `Successfully deleted sheet "${sheetTitleDeleted}" (ID: ${sheetIdToDelete}) from spreadsheet.`;
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error deleting sheet from spreadsheet ${args.spreadsheetId}: ${message}`);
+        if (error instanceof UserError) throw error;
+        throw new UserError(`Failed to delete sheet: ${message}`);
+      }
+    },
+  });
+
   // --- List Google Sheets ---
   server.addTool({
     name: 'listGoogleSheets',
