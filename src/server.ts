@@ -2546,17 +2546,13 @@ server.addTool({
         log.error(`OAuth failed for account: ${args.name}: ${err.message}`);
       });
 
-      return `**OAuth Authorization Required for "${args.name}"**
-
-Please open this URL in your browser to authorize:
+      return `ACTION REQUIRED: Open this URL to authorize account "${args.name}":
 
 ${session.authUrl}
 
-After you authorize in your browser, the account will be added automatically.
+^^^^ COPY AND OPEN THE URL ABOVE IN YOUR BROWSER ^^^^
 
-Listening on port ${port} for the OAuth callback...
-
-**Note:** If you're using Claude Desktop, you may need to open this URL manually or use the Playwright MCP to automate the browser authorization.`;
+After authorizing, the account will be added automatically. Server listening on port ${port}.`;
     } catch (error: any) {
       log.error(`Error starting OAuth: ${error.message || error}`);
       if (error instanceof UserError) throw error;
