@@ -61,7 +61,7 @@ export function registerDriveTools(
             'files(id,name,modifiedTime,createdTime,size,webViewLink,owners(displayName,emailAddress))',
         });
 
-        const files = response.data.files || [];
+        const files = response.data.files ?? [];
 
         if (files.length === 0) {
           return 'No Google Docs found matching your criteria.';
@@ -157,7 +157,7 @@ export function registerDriveTools(
           fields: 'files(id,name,modifiedTime,createdTime,webViewLink,owners(displayName),parents)',
         });
 
-        const files = response.data.files || [];
+        const files = response.data.files ?? [];
 
         if (files.length === 0) {
           return `No Google Docs found containing "${args.searchQuery}".`;
@@ -242,7 +242,7 @@ export function registerDriveTools(
             'files(id,name,modifiedTime,createdTime,webViewLink,owners(displayName),lastModifyingUser(displayName))',
         });
 
-        const files = response.data.files || [];
+        const files = response.data.files ?? [];
 
         if (files.length === 0) {
           return `No Google Docs found that were modified in the last ${args.daysBack} days.`;
@@ -299,10 +299,6 @@ export function registerDriveTools(
         });
 
         const file = response.data;
-
-        if (!file) {
-          throw new UserError(`Document with ID ${args.documentId} not found.`);
-        }
 
         const createdDate = file.createdTime
           ? new Date(file.createdTime).toLocaleString()
@@ -472,7 +468,7 @@ export function registerDriveTools(
           fields: 'files(id,name,mimeType,size,modifiedTime,webViewLink,owners(displayName))',
         });
 
-        const items = response.data.files || [];
+        const items = response.data.files ?? [];
 
         if (items.length === 0) {
           return "The folder is empty or you don't have permission to view its contents.";
@@ -650,7 +646,7 @@ export function registerDriveTools(
         });
 
         const fileName = fileInfo.data.name;
-        const currentParents = fileInfo.data.parents || [];
+        const currentParents = fileInfo.data.parents ?? [];
 
         const removeParents = args.removeFromAllParents && currentParents.length > 0
           ? currentParents.join(',')

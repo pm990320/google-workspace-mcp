@@ -324,10 +324,6 @@ export async function formatCells(
       sheetId = firstSheet.properties.sheetId;
     }
 
-    if (sheetId === undefined) {
-      throw new UserError('Could not determine sheet ID.');
-    }
-
     // Parse A1 range to get row/column indices
     const rangeMatch = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i.exec(a1Range);
     if (!rangeMatch) {

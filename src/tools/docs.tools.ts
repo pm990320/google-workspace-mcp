@@ -107,7 +107,7 @@ function convertParagraphToMarkdown(paragraph: Paragraph): string {
  */
 function convertTextRunToMarkdown(textRun: TextRun): string {
   let text = textRun.content || '';
-  const style = textRun.textStyle || {};
+  const style = textRun.textStyle ?? {};
 
   // Apply inline formatting
   if (style.bold) {
@@ -146,7 +146,7 @@ function convertTableToMarkdown(table: DocsTable): string {
   const rows = table.tableRows;
 
   rows.forEach((row: TableRow, rowIndex: number) => {
-    const cells = row.tableCells || [];
+    const cells = row.tableCells ?? [];
     const cellTexts = cells.map((cell: TableCell) => {
       let cellText = '';
       cell.content?.forEach((content: StructuralElement) => {
@@ -537,7 +537,7 @@ export function registerDocsTools(
 
         allTabs.forEach((tab: GDocsHelpers.TabWithLevel, index: number) => {
           const level = tab.level;
-          const tabProperties = tab.tabProperties || {};
+          const tabProperties = tab.tabProperties ?? {};
           const indent = '  '.repeat(level);
 
           // For single tab documents, show simplified info
@@ -651,9 +651,9 @@ export function registerDocsTools(
           bodyContent = docInfo.data.body?.content;
         }
 
-        if (bodyContent) {
+        if (bodyContent && bodyContent.length > 0) {
           const lastElement = bodyContent[bodyContent.length - 1];
-          if (lastElement?.endIndex) {
+          if (lastElement.endIndex) {
             endIndex = lastElement.endIndex - 1; // Insert *before* the final newline of the doc typically
           }
         }
@@ -1260,9 +1260,10 @@ export function registerDocsTools(
               parentFolderId = docInfo.data.parents[0];
               log.info(`Will upload image to document's parent folder: ${parentFolderId}`);
             }
-          } catch (folderError) {
+          } catch (folderError: unknown) {
+            const errorMsg = folderError instanceof Error ? folderError.message : String(folderError);
             log.warn(
-              `Could not determine document's parent folder, using Drive root: ${folderError}`
+              `Could not determine document's parent folder, using Drive root: ${errorMsg}`
             );
           }
         }
@@ -1372,7 +1373,7 @@ export function registerDocsTools(
           pageSize: 100,
         });
 
-        const comments = response.data.comments || [];
+        const comments = response.data.comments ?? [];
 
         if (comments.length === 0) {
           return 'No comments found in this document.';
@@ -1509,11 +1510,11 @@ export function registerDocsTools(
 
         // Extract the quoted text from the document
         let quotedText = '';
-        const content = doc.data.body?.content || [];
+        const content = doc.data.body?.content ?? [];
 
         for (const element of content) {
           if (element.paragraph) {
-            const elements = element.paragraph.elements || [];
+            const elements = element.paragraph.elements ?? [];
             for (const textElement of elements) {
               if (textElement.textRun) {
                 const elementStart = textElement.startIndex || 0;

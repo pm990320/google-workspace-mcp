@@ -31,7 +31,7 @@ export function registerFormsTools(
 
       return JSON.stringify(
         {
-          forms: (response.data.files || []).map((f) => ({
+          forms: (response.data.files ?? []).map((f) => ({
             id: f.id,
             name: f.name,
             createdTime: f.createdTime,
@@ -266,19 +266,19 @@ export function registerFormsTools(
         case 'multiple_choice':
           question.choiceQuestion = {
             type: 'RADIO',
-            options: args.options?.map((o) => ({ value: o })) || [{ value: 'Option 1' }],
+            options: args.options?.map((o) => ({ value: o })) ?? [{ value: 'Option 1' }],
           };
           break;
         case 'checkboxes':
           question.choiceQuestion = {
             type: 'CHECKBOX',
-            options: args.options?.map((o) => ({ value: o })) || [{ value: 'Option 1' }],
+            options: args.options?.map((o) => ({ value: o })) ?? [{ value: 'Option 1' }],
           };
           break;
         case 'dropdown':
           question.choiceQuestion = {
             type: 'DROP_DOWN',
-            options: args.options?.map((o) => ({ value: o })) || [{ value: 'Option 1' }],
+            options: args.options?.map((o) => ({ value: o })) ?? [{ value: 'Option 1' }],
           };
           break;
         case 'scale':

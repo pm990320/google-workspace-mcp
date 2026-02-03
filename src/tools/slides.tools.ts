@@ -31,7 +31,7 @@ export function registerSlidesTools(
 
       return JSON.stringify(
         {
-          presentations: (response.data.files || []).map((f) => ({
+          presentations: (response.data.files ?? []).map((f) => ({
             id: f.id,
             name: f.name,
             createdTime: f.createdTime,
@@ -183,14 +183,14 @@ export function registerSlidesTools(
       });
 
       // Find a matching layout
-      const layouts = pres.data.layouts || [];
+      const layouts = pres.data.layouts ?? [];
       let layoutId: string | undefined;
       for (const layout of layouts) {
         if (
-          layout.layoutProperties?.name?.includes(args.layout || 'BLANK') ||
-          layout.layoutProperties?.displayName?.includes(args.layout || 'BLANK')
+          layout.layoutProperties?.name?.includes(args.layout) ||
+          layout.layoutProperties?.displayName?.includes(args.layout)
         ) {
-          layoutId = layout.objectId || undefined;
+          layoutId = layout.objectId ?? undefined;
           break;
         }
       }

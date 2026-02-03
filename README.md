@@ -482,51 +482,25 @@ The credentials path will be stored in the account config and used for all subse
 
 ### Alternative: Service Account with Domain-Wide Delegation (Enterprise)
 
-For Google Workspace organizations that need to access documents across the domain without individual user OAuth flows, you can use a service account with domain-wide delegation.
+> **Note:** Service account authentication is not currently supported in the multi-account system. This section describes the planned feature. For now, please use the standard OAuth flow with `npx google-workspace-mcp accounts add <name>`.
 
-**Prerequisites:**
-- Google Workspace admin access to configure domain-wide delegation
-- A service account with domain-wide delegation enabled
+For Google Workspace organizations that need to access resources across the domain without individual user OAuth flows, service accounts with domain-wide delegation would allow:
 
-**Setup:**
+- Accessing any user's documents, Gmail, Calendar, etc. by impersonating them
+- Automated workflows without interactive OAuth consent
+- Centralized credential management for enterprise deployments
 
-1. **Create a Service Account** in Google Cloud Console:
-   - Go to "APIs & Services" → "Credentials" → "Create Credentials" → "Service Account"
-   - Download the JSON key file
+**Required scopes for domain-wide delegation:**
+- `https://www.googleapis.com/auth/documents`
+- `https://www.googleapis.com/auth/drive`
+- `https://www.googleapis.com/auth/spreadsheets`
+- `https://www.googleapis.com/auth/gmail.modify`
+- `https://www.googleapis.com/auth/calendar`
+- `https://www.googleapis.com/auth/presentations`
+- `https://www.googleapis.com/auth/forms.body`
+- `https://www.googleapis.com/auth/forms.responses.readonly`
 
-2. **Enable Domain-Wide Delegation** in Google Workspace Admin Console:
-   - Go to Security → API Controls → Domain-wide delegation
-   - Add the service account's client ID with the required scopes:
-     - `https://www.googleapis.com/auth/documents`
-     - `https://www.googleapis.com/auth/drive`
-     - `https://www.googleapis.com/auth/spreadsheets`
-
-3. **Configure Environment Variables:**
-   ```bash
-   # Path to your service account key file
-   export SERVICE_ACCOUNT_PATH="/path/to/service-account-key.json"
-
-   # Email of the user to impersonate (required for domain-wide delegation)
-   export GOOGLE_IMPERSONATE_USER="user@yourdomain.com"
-   ```
-
-4. **Update Claude Desktop Config** (add environment variables):
-   ```json
-   {
-     "mcpServers": {
-       "google-docs-mcp": {
-         "command": "node",
-         "args": ["/PATH/TO/mcp-googledocs-server/dist/server.js"],
-         "env": {
-           "SERVICE_ACCOUNT_PATH": "/path/to/service-account-key.json",
-           "GOOGLE_IMPERSONATE_USER": "user@yourdomain.com"
-         }
-       }
-     }
-   }
-   ```
-
-When `GOOGLE_IMPERSONATE_USER` is set, the server will impersonate that user when accessing Google APIs, allowing access to that user's documents and Drive.
+If you need service account support, please [open an issue](https://github.com/zueai/google-workspace-mcp/issues) describing your use case.
 
 ### Step 6: Configure Claude Desktop (Optional)
 

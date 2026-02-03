@@ -61,11 +61,17 @@ function openBrowser(url: string): void {
   });
 }
 
+interface PackageJson {
+  version: string;
+  name?: string;
+  description?: string;
+}
+
 const program = new Command();
 
 // Version from package.json
 const packageJsonPath = new URL('../package.json', import.meta.url);
-const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8')) as PackageJson;
 
 program
   .name('google-workspace-mcp')

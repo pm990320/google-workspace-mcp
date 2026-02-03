@@ -138,9 +138,10 @@ export function registerAccountsTools(
             pendingOAuthSessions.delete(args.name);
             log.info(`OAuth completed for account: ${args.name}`);
           })
-          .catch((err) => {
+          .catch((err: unknown) => {
             pendingOAuthSessions.delete(args.name);
-            log.error(`OAuth failed for account: ${args.name}: ${err.message}`);
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(`OAuth failed for account: ${args.name}: ${message}`);
           });
 
         let response = `ACTION REQUIRED: Open this URL to authorize account "${args.name}":

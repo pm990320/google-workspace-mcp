@@ -25,7 +25,7 @@ export function registerCalendarTools(
 
       return JSON.stringify(
         {
-          calendars: (response.data.items || []).map((c) => ({
+          calendars: (response.data.items ?? []).map((c) => ({
             id: c.id,
             summary: c.summary,
             description: c.description,
@@ -99,7 +99,7 @@ export function registerCalendarTools(
       return JSON.stringify(
         {
           timeZone: response.data.timeZone,
-          events: (response.data.items || []).map((e) => ({
+          events: (response.data.items ?? []).map((e) => ({
             id: e.id,
             summary: e.summary,
             description: e.description,

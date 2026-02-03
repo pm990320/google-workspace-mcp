@@ -46,7 +46,7 @@ export function registerGmailTools(
           q: args.query,
         });
 
-        const messages = response.data.messages || [];
+        const messages = response.data.messages ?? [];
         return JSON.stringify(
           {
             totalMessages: response.data.resultSizeEstimate,
@@ -94,7 +94,7 @@ export function registerGmailTools(
       });
 
       const message = response.data;
-      const headers = message.payload?.headers || [];
+      const headers = message.payload?.headers ?? [];
 
       // Extract common headers
       const getHeader = (name: string) =>
@@ -280,7 +280,7 @@ export function registerGmailTools(
         maxResults: Math.min(args.maxResults || 20, 100),
       });
 
-      const messages = listResponse.data.messages || [];
+      const messages = listResponse.data.messages ?? [];
 
       // Get snippets for each message
       const results = await Promise.all(
@@ -291,7 +291,7 @@ export function registerGmailTools(
             format: 'metadata',
             metadataHeaders: ['From', 'Subject', 'Date'],
           });
-          const headers = msg.data.payload?.headers || [];
+          const headers = msg.data.payload?.headers ?? [];
           const getHeader = (name: string) => headers.find((h) => h.name === name)?.value;
           return JSON.stringify(
             {
@@ -339,7 +339,7 @@ export function registerGmailTools(
 
       return JSON.stringify(
         {
-          labels: (response.data.labels || []).map((l) => ({
+          labels: (response.data.labels ?? []).map((l) => ({
             id: l.id,
             name: l.name,
             type: l.type,

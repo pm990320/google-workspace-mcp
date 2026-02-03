@@ -48,7 +48,7 @@ export interface AccountConfig {
 }
 
 export interface AccountsConfig {
-  accounts: Record<string, AccountConfig>;
+  accounts: Record<string, AccountConfig | undefined>;
   credentialsPath: string;
 }
 
@@ -221,6 +221,7 @@ export async function initializeAccounts(): Promise<void> {
   let validCount = 0;
   // Validate all configured accounts have valid tokens
   for (const [name, account] of Object.entries(config.accounts)) {
+    if (!account) continue;
     try {
       const authClient = await loadTokenForAccount(name);
       if (authClient) {
@@ -231,8 +232,9 @@ export async function initializeAccounts(): Promise<void> {
           `Warning: Could not load token for account "${name}" - may need re-authentication`
         );
       }
-    } catch (err) {
-      console.error(`Warning: Failed to load account "${name}": ${err}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Warning: Failed to load account "${name}": ${message}`);
     }
   }
 
@@ -281,7 +283,7 @@ export async function getAccountClients(accountName: string): Promise<AccountCli
  */
 export async function listAccounts(): Promise<AccountConfig[]> {
   const config = await loadAccountsConfig();
-  return Object.values(config.accounts);
+  return Object.values(config.accounts).filter((a): a is AccountConfig => a !== undefined);
 }
 
 /**
@@ -316,7 +318,7 @@ export async function getTokenInfo(accountName: string): Promise<{
 
     return {
       email: tokenInfo.data.email || undefined,
-      scopes: tokenInfo.data.scope?.split(' ') || [],
+      scopes: tokenInfo.data.scope?.split(' ') ?? [],
       expiry_date: credentials.expiry_date || undefined,
       access_token_preview: credentials.access_token ?
         `${credentials.access_token.substring(0, 20)}...` : undefined,
@@ -455,9 +457,10 @@ export async function completeAddAccount(
     // Using object wrapper to allow const declaration while still being mutable inside closure
     const timeout: { id?: NodeJS.Timeout } = {};
 
-    const server = http.createServer(async (req, res) => {
+    const server = http.createServer((req, res) => {
+      void (async () => {
       try {
-        const url = new URL(req.url || '', redirectUri);
+        const url = new URL(req.url ?? '', redirectUri);
         const code = url.searchParams.get('code');
 
         if (code) {
@@ -517,8 +520,9 @@ export async function completeAddAccount(
         clearTimeout(timeout.id);
         server.close();
         connections.forEach((conn) => conn.destroy());
-        reject(err);
+        reject(err instanceof Error ? err : new Error(String(err)));
       }
+      })();
     });
 
     // Track connections so we can properly close them
@@ -557,20 +561,22 @@ export async function completeAddAccount(
 export async function removeAccount(accountName: string): Promise<void> {
   const config = await loadAccountsConfig();
 
-  if (!config.accounts[accountName]) {
+  const accountToRemove = config.accounts[accountName];
+  if (!accountToRemove) {
     throw new Error(`Account "${accountName}" not found`);
   }
 
   // Remove token file
-  const tokenPath = config.accounts[accountName].tokenPath;
   try {
-    await fs.unlink(tokenPath);
+    await fs.unlink(accountToRemove.tokenPath);
   } catch {
     // Ignore if file doesn't exist
   }
 
-  // Remove from config
-  delete config.accounts[accountName];
+  // Remove from config using object rest spread instead of delete
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { [accountName]: _removed, ...remainingAccounts } = config.accounts;
+  config.accounts = remainingAccounts;
   await saveAccountsConfig(config);
 }
 

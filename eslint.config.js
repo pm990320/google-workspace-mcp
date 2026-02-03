@@ -107,6 +107,15 @@ export default tseslint.config(
         },
       ],
 
+      // Warn on TODO/FIXME comments (tracks incomplete work)
+      'no-warning-comments': [
+        'warn',
+        {
+          terms: ['TODO', 'FIXME', 'HACK', 'XXX'],
+          location: 'start',
+        },
+      ],
+
       // === Security (from eslint-plugin-security) ===
       // These are included via security.configs.recommended:
       // - security/detect-object-injection: Warn on dynamic property access

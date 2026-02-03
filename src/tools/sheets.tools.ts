@@ -41,7 +41,7 @@ export function registerSheetsTools(
 
       try {
         const response = await SheetsHelpers.readRange(sheets, args.spreadsheetId, args.range);
-        const values = response.values || [];
+        const values = response.values ?? [];
 
         if (values.length === 0) {
           return `Range ${args.range} is empty or does not exist.`;
@@ -252,7 +252,7 @@ export function registerSheetsTools(
         result += `**ID:** ${metadata.spreadsheetId}\n`;
         result += `**URL:** https://docs.google.com/spreadsheets/d/${metadata.spreadsheetId}\n\n`;
 
-        const sheetList = metadata.sheets || [];
+        const sheetList = metadata.sheets ?? [];
         result += `**Sheets (${sheetList.length}):**\n`;
         sheetList.forEach((sheet, index) => {
           const props = sheet.properties;
@@ -463,7 +463,7 @@ export function registerSheetsTools(
             'files(id,name,modifiedTime,createdTime,size,webViewLink,owners(displayName,emailAddress))',
         });
 
-        const files = response.data.files || [];
+        const files = response.data.files ?? [];
 
         if (files.length === 0) {
           return 'No Google Spreadsheets found matching your criteria.';

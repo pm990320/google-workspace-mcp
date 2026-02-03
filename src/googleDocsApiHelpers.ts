@@ -23,7 +23,7 @@ export async function executeBatchUpdate(
   documentId: string,
   requests: docs_v1.Schema$Request[]
 ): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
-  if (!requests || requests.length === 0) {
+  if (requests.length === 0) {
     // console.warn("executeBatchUpdate called with no requests.");
     return {}; // Nothing to do
   }
@@ -52,11 +52,13 @@ export async function executeBatchUpdate(
     // Translate common API errors to UserErrors
     if (code === 400 && message.includes('Invalid requests')) {
       // Try to extract more specific info if available
-      const details = (responseData as { error?: { details?: { description?: string }[] } })
-        ?.error?.details;
+      const errorResponse = responseData as
+        | { error?: { details?: { description?: string }[] } }
+        | undefined;
+      const details = errorResponse?.error?.details;
       let detailMsg = '';
       if (details && Array.isArray(details)) {
-        detailMsg = details.map((d) => d.description || JSON.stringify(d)).join('; ');
+        detailMsg = details.map((d) => d.description ?? JSON.stringify(d)).join('; ');
       }
       throw new UserError(
         `Invalid request sent to Google Docs API. Details: ${detailMsg || message}`

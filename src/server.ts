@@ -143,7 +143,7 @@ async function startServer() {
       transportType: 'stdio' as const,
     };
 
-    server.start(configToUse);
+    await server.start(configToUse);
     console.error(
       `MCP Server running using ${configToUse.transportType}. Awaiting client connection...`
     );
@@ -158,4 +158,4 @@ async function startServer() {
   }
 }
 
-startServer();
+void startServer();

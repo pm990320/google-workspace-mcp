@@ -130,7 +130,8 @@ async function authenticate(): Promise<OAuth2Client> {
   // For desktop apps, start a local server to receive the OAuth callback
   if (client_type === 'installed') {
     return new Promise((resolve, reject) => {
-      const server = http.createServer(async (req, res) => {
+      const server = http.createServer((req, res) => {
+        void (async () => {
         try {
           const url = new URL(req.url || '', `http://localhost:3000`);
           const code = url.searchParams.get('code');
@@ -163,6 +164,7 @@ async function authenticate(): Promise<OAuth2Client> {
           server.close();
           reject(new Error('Authentication failed'));
         }
+        })();
       });
 
       server.listen(3000, () => {
