@@ -1,5 +1,5 @@
 // docs.tools.ts - Google Docs tool definitions
-import { FastMCP, UserError } from 'fastmcp';
+import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { docs_v1, drive_v3 } from 'googleapis';
 import {
@@ -13,20 +13,32 @@ import {
   ApplyParagraphStyleToolParameters,
   ApplyParagraphStyleToolArgs,
   NotImplementedError,
+  FastMCPServer,
+  StructuralElement,
+  ParagraphElement,
+  Paragraph,
+  DocsTable,
+  TableRow,
+  TableCell,
+  TextRun,
+  DriveComment,
+  DriveReply,
+  DocumentContent,
 } from '../types.js';
 import * as GDocsHelpers from '../googleDocsApiHelpers.js';
+import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 
 /**
  * Converts Google Docs JSON structure to Markdown format
  */
-function convertDocsJsonToMarkdown(docData: any): string {
+function convertDocsJsonToMarkdown(docData: DocumentContent): string {
   let markdown = '';
 
   if (!docData.body?.content) {
     return 'Document appears to be empty.';
   }
 
-  docData.body.content.forEach((element: any) => {
+  docData.body.content.forEach((element: StructuralElement) => {
     if (element.paragraph) {
       markdown += convertParagraphToMarkdown(element.paragraph);
     } else if (element.table) {
@@ -42,7 +54,7 @@ function convertDocsJsonToMarkdown(docData: any): string {
 /**
  * Converts a paragraph element to markdown
  */
-function convertParagraphToMarkdown(paragraph: any): string {
+function convertParagraphToMarkdown(paragraph: Paragraph): string {
   let text = '';
   let isHeading = false;
   let headingLevel = 0;
@@ -70,7 +82,7 @@ function convertParagraphToMarkdown(paragraph: any): string {
 
   // Process text elements
   if (paragraph.elements) {
-    paragraph.elements.forEach((element: any) => {
+    paragraph.elements.forEach((element: ParagraphElement) => {
       if (element.textRun) {
         text += convertTextRunToMarkdown(element.textRun);
       }
@@ -93,7 +105,7 @@ function convertParagraphToMarkdown(paragraph: any): string {
 /**
  * Converts a textRun element to markdown with formatting
  */
-function convertTextRunToMarkdown(textRun: any): string {
+function convertTextRunToMarkdown(textRun: TextRun): string {
   let text = textRun.content || '';
   const style = textRun.textStyle || {};
 
@@ -125,7 +137,7 @@ function convertTextRunToMarkdown(textRun: any): string {
 /**
  * Converts a table element to markdown
  */
-function convertTableToMarkdown(table: any): string {
+function convertTableToMarkdown(table: DocsTable): string {
   if (!table.tableRows || table.tableRows.length === 0) {
     return '';
   }
@@ -133,12 +145,12 @@ function convertTableToMarkdown(table: any): string {
   let markdown = '\n';
   const rows = table.tableRows;
 
-  rows.forEach((row: any, rowIndex: number) => {
+  rows.forEach((row: TableRow, rowIndex: number) => {
     const cells = row.tableCells || [];
-    const cellTexts = cells.map((cell: any) => {
+    const cellTexts = cells.map((cell: TableCell) => {
       let cellText = '';
-      cell.content?.forEach((content: any) => {
-        content.paragraph?.elements?.forEach((element: any) => {
+      cell.content?.forEach((content: StructuralElement) => {
+        content.paragraph?.elements?.forEach((element: ParagraphElement) => {
           if (element.textRun?.content) {
             cellText += element.textRun.content.trim();
           }
@@ -159,7 +171,7 @@ function convertTableToMarkdown(table: any): string {
 }
 
 export function registerDocsTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getDocsClient: (accountName: string) => Promise<docs_v1.Docs>,
   getDriveClient: (accountName: string) => Promise<drive_v3.Drive>
 ) {
@@ -217,7 +229,7 @@ export function registerDocsTools(
         log.info(`Fetched doc: ${args.documentId}${args.tabId ? ` (tab: ${args.tabId})` : ''}`);
 
         // If tabId is specified, find the specific tab
-        let contentSource: any;
+        let contentSource: DocumentContent;
         if (args.tabId) {
           const targetTab = GDocsHelpers.findTabById(res.data, args.tabId);
           if (!targetTab) {
@@ -266,12 +278,12 @@ export function registerDocsTools(
         let elementCount = 0;
 
         // Process all content elements from contentSource
-        contentSource.body?.content?.forEach((element: any) => {
+        contentSource.body?.content?.forEach((element: StructuralElement) => {
           elementCount++;
 
           // Handle paragraphs
           if (element.paragraph?.elements) {
-            element.paragraph.elements.forEach((pe: any) => {
+            element.paragraph.elements.forEach((pe: ParagraphElement) => {
               if (pe.textRun?.content) {
                 textContent += pe.textRun.content;
               }
@@ -280,10 +292,10 @@ export function registerDocsTools(
 
           // Handle tables
           if (element.table?.tableRows) {
-            element.table.tableRows.forEach((row: any) => {
-              row.tableCells?.forEach((cell: any) => {
-                cell.content?.forEach((cellElement: any) => {
-                  cellElement.paragraph?.elements?.forEach((pe: any) => {
+            element.table.tableRows.forEach((row: TableRow) => {
+              row.tableCells?.forEach((cell: TableCell) => {
+                cell.content?.forEach((cellElement: StructuralElement) => {
+                  cellElement.paragraph?.elements?.forEach((pe: ParagraphElement) => {
                     if (pe.textRun?.content) {
                       textContent += pe.textRun.content;
                     }
@@ -315,19 +327,22 @@ export function registerDocsTools(
         );
 
         return fullResponse;
-      } catch (error: any) {
-        log.error(`Error reading doc ${args.documentId}: ${error.message || error}`);
-        log.error(`Error details: ${JSON.stringify(error.response?.data || error)}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error reading doc ${args.documentId}: ${message}`);
         // Handle errors thrown by helpers or API directly
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error;
         // Generic fallback for API errors not caught by helpers
-        if (error.code === 404) throw new UserError(`Doc not found (ID: ${args.documentId}).`);
-        if (error.code === 403)
+        const apiError = isGoogleApiError(error) ? error : null;
+        const code = apiError?.code;
+        if (code === 404) throw new UserError(`Doc not found (ID: ${args.documentId}).`);
+        if (code === 403)
           throw new UserError(`Permission denied for doc (ID: ${args.documentId}).`);
         // Extract detailed error information from Google API response
-        const errorDetails = error.response?.data?.error?.message || error.message || 'Unknown error';
-        const errorCode = error.response?.data?.error?.code || error.code;
+        const responseData = apiError?.response?.data as { error?: { message?: string; code?: number } } | undefined;
+        const errorDetails = responseData?.error?.message || message;
+        const errorCode = responseData?.error?.code || code;
         throw new UserError(
           `Failed to read doc: ${errorDetails}${errorCode ? ` (Code: ${errorCode})` : ''}`
         );
@@ -415,7 +430,7 @@ export function registerDocsTools(
 
         // Delete the old text, then insert new text at that position
         // We do this as a batch update for atomicity
-        const requests: any[] = [];
+        const requests: docs_v1.Schema$Request[] = [];
 
         // Delete the old text
         requests.push({
@@ -452,13 +467,15 @@ export function registerDocsTools(
         const netChange = charsAdded - charsRemoved;
 
         return `Successfully edited document. Replaced ${charsRemoved} characters with ${charsAdded} characters (net change: ${netChange >= 0 ? '+' : ''}${netChange}).`;
-      } catch (error: any) {
-        log.error(`Error editing doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error editing doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        if (error.code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
-        if (error.code === 403)
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
+        if (code === 403)
           throw new UserError(`Permission denied for document (ID: ${args.documentId}).`);
-        throw new UserError(`Failed to edit document: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to edit document: ${message}`);
       }
     },
   });
@@ -559,12 +576,14 @@ export function registerDocsTools(
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error listing tabs for doc ${args.documentId}: ${error.message || error}`);
-        if (error.code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing tabs for doc ${args.documentId}: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
+        if (code === 403)
           throw new UserError(`Permission denied for document (ID: ${args.documentId}).`);
-        throw new UserError(`Failed to list tabs: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to list tabs: ${message}`);
       }
     },
   });
@@ -614,7 +633,7 @@ export function registerDocsTools(
         });
 
         let endIndex = 1;
-        let bodyContent: any;
+        let bodyContent: StructuralElement[] | undefined;
 
         // If tabId is specified, find the specific tab
         if (args.tabId) {
@@ -645,7 +664,7 @@ export function registerDocsTools(
 
         if (!textToInsert) return 'Nothing to append.';
 
-        const location: any = { index: endIndex };
+        const location: docs_v1.Schema$Location = { index: endIndex };
         if (args.tabId) {
           location.tabId = args.tabId;
         }
@@ -657,11 +676,12 @@ export function registerDocsTools(
           `Successfully appended to doc: ${args.documentId}${args.tabId ? ` (tab: ${args.tabId})` : ''}`
         );
         return `Successfully appended text to ${args.tabId ? `tab ${args.tabId} in ` : ''}document ${args.documentId}.`;
-      } catch (error: any) {
-        log.error(`Error appending to doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error appending to doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error;
-        throw new UserError(`Failed to append to doc: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to append to doc: ${message}`);
       }
     },
   });
@@ -715,7 +735,7 @@ export function registerDocsTools(
           }
 
           // Insert with tabId
-          const location: any = { index: args.index, tabId: args.tabId };
+          const location: docs_v1.Schema$Location = { index: args.index, tabId: args.tabId };
           const request: docs_v1.Schema$Request = {
             insertText: { location, text: args.textToInsert },
           };
@@ -725,10 +745,11 @@ export function registerDocsTools(
           await GDocsHelpers.insertText(docs, args.documentId, args.textToInsert, args.index);
         }
         return `Successfully inserted text at index ${args.index}${args.tabId ? ` in tab ${args.tabId}` : ''}.`;
-      } catch (error: any) {
-        log.error(`Error inserting text in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error inserting text in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to insert text: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to insert text: ${message}`);
       }
     },
   });
@@ -789,7 +810,7 @@ export function registerDocsTools(
           }
         }
 
-        const range: any = { startIndex: args.startIndex, endIndex: args.endIndex };
+        const range: docs_v1.Schema$Range = { startIndex: args.startIndex, endIndex: args.endIndex };
         if (args.tabId) {
           range.tabId = args.tabId;
         }
@@ -799,10 +820,11 @@ export function registerDocsTools(
         };
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [request]);
         return `Successfully deleted content in range ${args.startIndex}-${args.endIndex}${args.tabId ? ` in tab ${args.tabId}` : ''}.`;
-      } catch (error: any) {
-        log.error(`Error deleting range in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error deleting range in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to delete range: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to delete range: ${message}`);
       }
     },
   });
@@ -822,7 +844,14 @@ export function registerDocsTools(
     parameters: ApplyTextStyleToolParameters,
     execute: async (args: ApplyTextStyleToolArgs, { log }) => {
       const docs = await getDocsClient(args.account);
-      let { startIndex, endIndex } = args.target as any; // Will be updated if target is text
+      let startIndex: number | undefined;
+      let endIndex: number | undefined;
+
+      // Extract from target if it's a range type
+      if ('startIndex' in args.target && 'endIndex' in args.target) {
+        startIndex = args.target.startIndex;
+        endIndex = args.target.endIndex;
+      }
 
       log.info(
         `Applying text style in doc ${args.documentId}. Target: ${JSON.stringify(args.target)}, Style: ${JSON.stringify(args.style)}`
@@ -868,11 +897,12 @@ export function registerDocsTools(
 
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
         return `Successfully applied text style (${requestInfo.fields.join(', ')}) to range ${startIndex}-${endIndex}.`;
-      } catch (error: any) {
-        log.error(`Error applying text style in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error applying text style in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error; // Should not happen here
-        throw new UserError(`Failed to apply text style: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to apply text style: ${message}`);
       }
     },
   });
@@ -989,16 +1019,16 @@ export function registerDocsTools(
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
 
         return `Successfully applied paragraph styles (${requestInfo.fields.join(', ')}) to the paragraph.`;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         // Detailed error logging
-        log.error(`Error applying paragraph style in doc ${args.documentId}:`);
-        log.error(error.stack || error.message || error);
+        log.error(`Error applying paragraph style in doc ${args.documentId}: ${message}`);
 
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error;
 
         // Provide a more helpful error message
-        throw new UserError(`Failed to apply paragraph style: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to apply paragraph style: ${message}`);
       }
     },
   });
@@ -1032,10 +1062,11 @@ export function registerDocsTools(
         await GDocsHelpers.createTable(docs, args.documentId, args.rows, args.columns, args.index);
         // The API response contains info about the created table, but might be too complex to return here.
         return `Successfully inserted a ${args.rows}x${args.columns} table at index ${args.index}.`;
-      } catch (error: any) {
-        log.error(`Error inserting table in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error inserting table in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to insert table: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to insert table: ${message}`);
       }
     },
   });
@@ -1112,10 +1143,11 @@ export function registerDocsTools(
         };
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [request]);
         return `Successfully inserted page break at index ${args.index}.`;
-      } catch (error: any) {
-        log.error(`Error inserting page break in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error inserting page break in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to insert page break: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to insert page break: ${message}`);
       }
     },
   });
@@ -1166,10 +1198,11 @@ export function registerDocsTools(
         }
 
         return `Successfully inserted image from URL at index ${args.index}${sizeInfo}.`;
-      } catch (error: any) {
-        log.error(`Error inserting image in doc ${args.documentId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error inserting image in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to insert image: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to insert image: ${message}`);
       }
     },
   });
@@ -1259,13 +1292,14 @@ export function registerDocsTools(
         }
 
         return `Successfully uploaded image to Drive and inserted it at index ${args.index}${sizeInfo}.\nImage URL: ${imageUrl}`;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         log.error(
-          `Error uploading/inserting local image in doc ${args.documentId}: ${error.message || error}`
+          `Error uploading/inserting local image in doc ${args.documentId}: ${message}`
         );
         if (error instanceof UserError) throw error;
         throw new UserError(
-          `Failed to upload/insert local image: ${error.message || 'Unknown error'}`
+          `Failed to upload/insert local image: ${message}`
         );
       }
     },
@@ -1302,13 +1336,14 @@ export function registerDocsTools(
           args.range?.endIndex
         );
         return `Attempted to fix list formatting. Please review the document for accuracy.`;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         log.error(
-          `Error fixing list formatting in doc ${args.documentId}: ${error.message || error}`
+          `Error fixing list formatting in doc ${args.documentId}: ${message}`
         );
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error; // Expected if helper not implemented
-        throw new UserError(`Failed to fix list formatting: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to fix list formatting: ${message}`);
       }
     },
   });
@@ -1345,7 +1380,7 @@ export function registerDocsTools(
 
         // Format comments for display
         const formattedComments = comments
-          .map((comment: any, index: number) => {
+          .map((comment: DriveComment, index: number) => {
             const replies = comment.replies?.length || 0;
             const status = comment.resolved ? ' [RESOLVED]' : '';
             const author = comment.author?.displayName || 'Unknown';
@@ -1373,9 +1408,10 @@ export function registerDocsTools(
           .join('\n');
 
         return `Found ${comments.length} comment${comments.length === 1 ? '' : 's'}:\n${formattedComments}`;
-      } catch (error: any) {
-        log.error(`Error listing comments: ${error.message || error}`);
-        throw new UserError(`Failed to list comments: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing comments: ${message}`);
+        throw new UserError(`Failed to list comments: ${message}`);
       }
     },
   });
@@ -1418,7 +1454,7 @@ export function registerDocsTools(
         // Add replies if any
         if (comment.replies && comment.replies.length > 0) {
           result += '\n\n**Replies:**';
-          comment.replies.forEach((reply: any, index: number) => {
+          comment.replies.forEach((reply: DriveReply, index: number) => {
             const replyAuthor = reply.author?.displayName || 'Unknown';
             const replyDate = reply.createdTime
               ? new Date(reply.createdTime).toLocaleDateString()
@@ -1428,9 +1464,10 @@ export function registerDocsTools(
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error getting comment: ${error.message || error}`);
-        throw new UserError(`Failed to get comment: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error getting comment: ${message}`);
+        throw new UserError(`Failed to get comment: ${message}`);
       }
     },
   });
@@ -1520,9 +1557,10 @@ export function registerDocsTools(
         });
 
         return `Comment added successfully. Comment ID: ${response.data.id}`;
-      } catch (error: any) {
-        log.error(`Error adding comment: ${error.message || error}`);
-        throw new UserError(`Failed to add comment: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error adding comment: ${message}`);
+        throw new UserError(`Failed to add comment: ${message}`);
       }
     },
   });
@@ -1557,9 +1595,10 @@ export function registerDocsTools(
         });
 
         return `Reply added successfully. Reply ID: ${response.data.id}`;
-      } catch (error: any) {
-        log.error(`Error adding reply: ${error.message || error}`);
-        throw new UserError(`Failed to add reply: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error adding reply: ${message}`);
+        throw new UserError(`Failed to add reply: ${message}`);
       }
     },
   });
@@ -1614,10 +1653,13 @@ export function registerDocsTools(
         } else {
           return `Attempted to resolve comment ${args.commentId}, but the resolved status may not persist in the Google Docs UI due to API limitations. The comment can be resolved manually in the Google Docs interface.`;
         }
-      } catch (error: any) {
-        log.error(`Error resolving comment: ${error.message || error}`);
-        const errorDetails = error.response?.data?.error?.message || error.message || 'Unknown error';
-        const errorCode = error.response?.data?.error?.code;
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error resolving comment: ${message}`);
+        const apiError = isGoogleApiError(error) ? error : null;
+        const responseData = apiError?.response?.data as { error?: { message?: string; code?: number } } | undefined;
+        const errorDetails = responseData?.error?.message || message;
+        const errorCode = responseData?.error?.code;
         throw new UserError(
           `Failed to resolve comment: ${errorDetails}${errorCode ? ` (Code: ${errorCode})` : ''}`
         );
@@ -1650,9 +1692,10 @@ export function registerDocsTools(
         });
 
         return `Comment ${args.commentId} has been deleted.`;
-      } catch (error: any) {
-        log.error(`Error deleting comment: ${error.message || error}`);
-        throw new UserError(`Failed to delete comment: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error deleting comment: ${message}`);
+        throw new UserError(`Failed to delete comment: ${message}`);
       }
     },
   });
@@ -1794,12 +1837,13 @@ export function registerDocsTools(
 
         await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [requestInfo.request]);
         return `Successfully applied formatting to instance ${args.matchInstance} of "${args.textToFind}".`;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
         log.error(
-          `Error in formatMatchingText for doc ${args.documentId}: ${error.message || error}`
+          `Error in formatMatchingText for doc ${args.documentId}: ${message}`
         );
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to format text: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to format text: ${message}`);
       }
     },
   });

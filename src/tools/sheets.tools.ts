@@ -1,11 +1,13 @@
 // sheets.tools.ts - Google Sheets tool module
-import { FastMCP, UserError } from 'fastmcp';
+import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { sheets_v4, drive_v3 } from 'googleapis';
 import * as SheetsHelpers from '../googleSheetsApiHelpers.js';
+import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
+import { FastMCPServer } from '../types.js';
 
 export function registerSheetsTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getSheetsClient: (accountName: string) => Promise<sheets_v4.Sheets>,
   getDriveClient: (accountName: string) => Promise<drive_v3.Drive>
 ) {
@@ -51,10 +53,11 @@ export function registerSheetsTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error reading spreadsheet ${args.spreadsheetId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error reading spreadsheet ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to read spreadsheet: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to read spreadsheet: ${message}`);
       }
     },
   });
@@ -81,7 +84,7 @@ export function registerSheetsTools(
       spreadsheetId: z.string().describe('The ID of the Google Spreadsheet (from the URL).'),
       range: z.string().describe('A1 notation range to write to (e.g., "A1:B2" or "Sheet1!A1:B2").'),
       values: z
-        .array(z.array(z.any()))
+        .array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
         .describe('2D array of values to write. Each inner array represents a row.'),
       valueInputOption: z
         .enum(['RAW', 'USER_ENTERED'])
@@ -109,10 +112,11 @@ export function registerSheetsTools(
         const updatedColumns = response.updatedColumns || 0;
 
         return `Successfully wrote ${updatedCells} cells (${updatedRows} rows, ${updatedColumns} columns) to range ${args.range}.`;
-      } catch (error: any) {
-        log.error(`Error writing to spreadsheet ${args.spreadsheetId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error writing to spreadsheet ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to write to spreadsheet: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to write to spreadsheet: ${message}`);
       }
     },
   });
@@ -142,7 +146,7 @@ export function registerSheetsTools(
           'A1 notation range indicating where to append (e.g., "A1" or "Sheet1!A1"). Data will be appended starting from this range.'
         ),
       values: z
-        .array(z.array(z.any()))
+        .array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
         .describe('2D array of values to append. Each inner array represents a row.'),
       valueInputOption: z
         .enum(['RAW', 'USER_ENTERED'])
@@ -170,10 +174,11 @@ export function registerSheetsTools(
         const updatedRange = response.updates?.updatedRange || args.range;
 
         return `Successfully appended ${updatedRows} row(s) (${updatedCells} cells) to spreadsheet. Updated range: ${updatedRange}`;
-      } catch (error: any) {
-        log.error(`Error appending to spreadsheet ${args.spreadsheetId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error appending to spreadsheet ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to append to spreadsheet: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to append to spreadsheet: ${message}`);
       }
     },
   });
@@ -208,12 +213,11 @@ export function registerSheetsTools(
         const clearedRange = response.clearedRange || args.range;
 
         return `Successfully cleared range ${clearedRange}.`;
-      } catch (error: any) {
-        log.error(
-          `Error clearing range in spreadsheet ${args.spreadsheetId}: ${error.message || error}`
-        );
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error clearing range in spreadsheet ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to clear range: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to clear range: ${message}`);
       }
     },
   });
@@ -262,10 +266,11 @@ export function registerSheetsTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error getting spreadsheet info ${args.spreadsheetId}: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error getting spreadsheet info ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to get spreadsheet info: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to get spreadsheet info: ${message}`);
       }
     },
   });
@@ -304,12 +309,11 @@ export function registerSheetsTools(
         }
 
         return `Successfully added sheet "${addedSheet.title}" (Sheet ID: ${addedSheet.sheetId}) to spreadsheet.`;
-      } catch (error: any) {
-        log.error(
-          `Error adding sheet to spreadsheet ${args.spreadsheetId}: ${error.message || error}`
-        );
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error adding sheet to spreadsheet ${args.spreadsheetId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to add sheet: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to add sheet: ${message}`);
       }
     },
   });
@@ -340,7 +344,7 @@ export function registerSheetsTools(
           'ID of folder where spreadsheet should be created. If not provided, creates in Drive root.'
         ),
       initialData: z
-        .array(z.array(z.any()))
+        .array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
         .optional()
         .describe(
           'Optional initial data to populate in the first sheet. Each inner array represents a row.'
@@ -383,21 +387,24 @@ export function registerSheetsTools(
               'USER_ENTERED'
             );
             result += `\n\nInitial data added to the spreadsheet.`;
-          } catch (contentError: any) {
-            log.warn(`Spreadsheet created but failed to add initial data: ${contentError.message}`);
+          } catch (contentError: unknown) {
+            const contentMessage = getErrorMessage(contentError);
+            log.warn(`Spreadsheet created but failed to add initial data: ${contentMessage}`);
             result += `\n\nSpreadsheet created but failed to add initial data. You can add data manually.`;
           }
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error creating spreadsheet: ${error.message || error}`);
-        if (error.code === 404) throw new UserError('Parent folder not found. Check the folder ID.');
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        log.error(`Error creating spreadsheet: ${message}`);
+        if (code === 404) throw new UserError('Parent folder not found. Check the folder ID.');
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have write access to the destination folder.'
           );
-        throw new UserError(`Failed to create spreadsheet: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to create spreadsheet: ${message}`);
       }
     },
   });
@@ -476,13 +483,15 @@ export function registerSheetsTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error listing Google Sheets: ${error.message || error}`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        log.error(`Error listing Google Sheets: ${message}`);
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have granted Google Drive access to the application.'
           );
-        throw new UserError(`Failed to list spreadsheets: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to list spreadsheets: ${message}`);
       }
     },
   });

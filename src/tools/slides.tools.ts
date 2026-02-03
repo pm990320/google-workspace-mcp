@@ -1,10 +1,10 @@
 // slides.tools.ts - Auto-generated tool module
-import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { slides_v1, drive_v3 } from 'googleapis';
+import { FastMCPServer, PageElement, SlidesRequest } from '../types.js';
 
 export function registerSlidesTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getClient: (accountName: string) => Promise<slides_v1.Slides>,
   getDrive: (accountName: string) => Promise<drive_v3.Drive>
 ) {
@@ -78,7 +78,7 @@ export function registerSlidesTools(
           slides: pres.slides?.map((slide, idx) => {
             // Extract text content from the slide
             const textElements: string[] = [];
-            const extractText = (element: any) => {
+            const extractText = (element: PageElement) => {
               if (element.shape?.text?.textElements) {
                 for (const te of element.shape.text.textElements) {
                   if (te.textRun?.content) {
@@ -197,7 +197,7 @@ export function registerSlidesTools(
 
       const slideId = 'slide_' + Date.now().toString(36);
 
-      const requests: any[] = [
+      const requests: SlidesRequest[] = [
         {
           createSlide: {
             objectId: slideId,

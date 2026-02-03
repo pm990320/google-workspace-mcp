@@ -1,10 +1,11 @@
 // gmail.tools.ts - Auto-generated tool module
-import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { gmail_v1 } from 'googleapis';
+import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
+import { FastMCPServer, MessagePart } from '../types.js';
 
 export function registerGmailTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getClient: (accountName: string) => Promise<gmail_v1.Gmail>
 ) {
   server.addTool({
@@ -55,16 +56,11 @@ export function registerGmailTools(
           null,
           2
         );
-      } catch (error: any) {
-        const errorDetails = {
-          message: error.message,
-          code: error.code,
-          status: error.status,
-          errors: error.errors,
-          response: error.response?.data,
-        };
-        console.error('[listGmailMessages] Error details:', JSON.stringify(errorDetails, null, 2));
-        throw new Error(`Gmail API error: ${error.message}. Code: ${error.code}. Details: ${JSON.stringify(error.errors || error.response?.data || 'No additional details')}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        console.error('[listGmailMessages] Error:', message);
+        throw new Error(`Gmail API error: ${message}. Code: ${code || 'unknown'}`);
       }
     },
   });
@@ -106,7 +102,7 @@ export function registerGmailTools(
 
       // Extract body
       let body = '';
-      const extractBody = (part: any): string => {
+      const extractBody = (part: MessagePart): string => {
         if (part.body?.data) {
           return Buffer.from(part.body.data, 'base64').toString('utf8');
         }
@@ -140,7 +136,7 @@ export function registerGmailTools(
         size: number;
         attachmentId: string;
       }[] = [];
-      const extractAttachments = (part: any) => {
+      const extractAttachments = (part: MessagePart) => {
         if (part.filename && part.body?.attachmentId) {
           attachments.push({
             filename: part.filename,

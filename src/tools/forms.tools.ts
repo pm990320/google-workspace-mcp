@@ -1,10 +1,10 @@
 // forms.tools.ts - Auto-generated tool module
-import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { forms_v1, drive_v3 } from 'googleapis';
+import { FastMCPServer, FormsQuestion } from '../types.js';
 
 export function registerFormsTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getClient: (accountName: string) => Promise<forms_v1.Forms>,
   getDrive: (accountName: string) => Promise<drive_v3.Drive>
 ) {
@@ -254,7 +254,7 @@ export function registerFormsTools(
     async execute(args, { log: _log }) {
       const forms = await getClient(args.account);
 
-      const question: any = { required: args.required };
+      const question: FormsQuestion = { required: args.required };
 
       switch (args.questionType) {
         case 'short_text':

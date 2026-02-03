@@ -1,5 +1,5 @@
 // accounts.tools.ts - Account management tool module
-import { FastMCP, UserError } from 'fastmcp';
+import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import {
   listAccounts as listAccountsFromRegistry,
@@ -9,6 +9,8 @@ import {
   getCredentialsPath,
   AccountConfig,
 } from '../accounts.js';
+import { getErrorMessage } from '../errorHelpers.js';
+import { FastMCPServer } from '../types.js';
 
 // Store pending OAuth sessions
 const pendingOAuthSessions: Map<
@@ -22,7 +24,7 @@ const pendingOAuthSessions: Map<
 > = new Map();
 
 export function registerAccountsTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   ensureAccountsInitialized: () => Promise<void>
 ) {
   // --- List Accounts ---
@@ -58,9 +60,10 @@ export function registerAccountsTools(
         result += `\nUse the account name (e.g., "${accounts[0].name}") as the 'account' parameter in other tools.`;
 
         return result;
-      } catch (error: any) {
-        log.error(`Error listing accounts: ${error.message || error}`);
-        throw new UserError(`Failed to list accounts: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing accounts: ${message}`);
+        throw new UserError(`Failed to list accounts: ${message}`);
       }
     },
   });
@@ -153,10 +156,11 @@ After authorizing, the account will be added automatically. Server listening on 
         }
 
         return response;
-      } catch (error: any) {
-        log.error(`Error starting OAuth: ${error.message || error}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error starting OAuth: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(`Failed to start OAuth flow: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to start OAuth flow: ${message}`);
       }
     },
   });
@@ -183,9 +187,10 @@ After authorizing, the account will be added automatically. Server listening on 
       try {
         await removeAccountFromRegistry(args.name);
         return `Successfully removed account "${args.name}".`;
-      } catch (error: any) {
-        log.error(`Error removing account: ${error.message || error}`);
-        throw new UserError(`Failed to remove account: ${error.message || 'Unknown error'}`);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error removing account: ${message}`);
+        throw new UserError(`Failed to remove account: ${message}`);
       }
     },
   });

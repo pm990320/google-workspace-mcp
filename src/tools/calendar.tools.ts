@@ -1,10 +1,10 @@
 // calendar.tools.ts - Auto-generated tool module
-import { FastMCP } from 'fastmcp';
 import { z } from 'zod';
 import { calendar_v3 } from 'googleapis';
+import { FastMCPServer } from '../types.js';
 
 export function registerCalendarTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getClient: (accountName: string) => Promise<calendar_v3.Calendar>
 ) {
   server.addTool({

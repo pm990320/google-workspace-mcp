@@ -1,11 +1,12 @@
 // drive.tools.ts - Google Drive tool module
-import { FastMCP, UserError } from 'fastmcp';
+import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { drive_v3, docs_v1 } from 'googleapis';
-import { AccountDocumentParameters } from '../types.js';
+import { AccountDocumentParameters, FastMCPServer } from '../types.js';
+import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 
 export function registerDriveTools(
-  server: FastMCP<any>,
+  server: FastMCPServer,
   getDriveClient: (accountName: string) => Promise<drive_v3.Drive>,
   getDocsClient: (accountName: string) => Promise<docs_v1.Docs>
 ) {
@@ -80,13 +81,15 @@ export function registerDriveTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error listing Google Docs: ${error.message || error}`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing Google Docs: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have granted Google Drive access to the application.'
           );
-        throw new UserError(`Failed to list documents: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to list documents: ${message}`);
       }
     },
   });
@@ -174,13 +177,15 @@ export function registerDriveTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error searching Google Docs: ${error.message || error}`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error searching Google Docs: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have granted Google Drive access to the application.'
           );
-        throw new UserError(`Failed to search documents: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to search documents: ${message}`);
       }
     },
   });
@@ -259,13 +264,15 @@ export function registerDriveTools(
         });
 
         return result;
-      } catch (error: any) {
-        log.error(`Error getting recent Google Docs: ${error.message || error}`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error getting recent Google Docs: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have granted Google Drive access to the application.'
           );
-        throw new UserError(`Failed to get recent documents: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to get recent documents: ${message}`);
       }
     },
   });
@@ -329,12 +336,14 @@ export function registerDriveTools(
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error getting document info: ${error.message || error}`);
-        if (error.code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error getting document info: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError(`Document not found (ID: ${args.documentId}).`);
+        if (code === 403)
           throw new UserError('Permission denied. Make sure you have access to this document.');
-        throw new UserError(`Failed to get document info: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to get document info: ${message}`);
       }
     },
   });
@@ -386,15 +395,17 @@ export function registerDriveTools(
 
         const folder = response.data;
         return `Successfully created folder "${folder.name}" (ID: ${folder.id})\nLink: ${folder.webViewLink}`;
-      } catch (error: any) {
-        log.error(`Error creating folder: ${error.message || error}`);
-        if (error.code === 404)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error creating folder: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404)
           throw new UserError('Parent folder not found. Check the parent folder ID.');
-        if (error.code === 403)
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have write access to the parent folder.'
           );
-        throw new UserError(`Failed to create folder: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to create folder: ${message}`);
       }
     },
   });
@@ -506,12 +517,14 @@ export function registerDriveTools(
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error listing folder contents: ${error.message || error}`);
-        if (error.code === 404) throw new UserError('Folder not found. Check the folder ID.');
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing folder contents: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('Folder not found. Check the folder ID.');
+        if (code === 403)
           throw new UserError('Permission denied. Make sure you have access to this folder.');
-        throw new UserError(`Failed to list folder contents: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to list folder contents: ${message}`);
       }
     },
   });
@@ -586,12 +599,14 @@ export function registerDriveTools(
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error getting folder info: ${error.message || error}`);
-        if (error.code === 404) throw new UserError(`Folder not found (ID: ${args.folderId}).`);
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error getting folder info: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError(`Folder not found (ID: ${args.folderId}).`);
+        if (code === 403)
           throw new UserError('Permission denied. Make sure you have access to this folder.');
-        throw new UserError(`Failed to get folder info: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to get folder info: ${message}`);
       }
     },
   });
@@ -637,29 +652,30 @@ export function registerDriveTools(
         const fileName = fileInfo.data.name;
         const currentParents = fileInfo.data.parents || [];
 
-        const updateParams: any = {
+        const removeParents = args.removeFromAllParents && currentParents.length > 0
+          ? currentParents.join(',')
+          : undefined;
+
+        const response = await drive.files.update({
           fileId: args.fileId,
           addParents: args.newParentId,
+          removeParents,
           fields: 'id,name,parents',
-        };
-
-        if (args.removeFromAllParents && currentParents.length > 0) {
-          updateParams.removeParents = currentParents.join(',');
-        }
-
-        const response = await drive.files.update(updateParams);
+        });
 
         const action = args.removeFromAllParents ? 'moved' : 'copied';
         return `Successfully ${action} "${fileName}" to new location.\nFile ID: ${response.data.id}`;
-      } catch (error: any) {
-        log.error(`Error moving file: ${error.message || error}`);
-        if (error.code === 404)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error moving file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404)
           throw new UserError('File or destination folder not found. Check the IDs.');
-        if (error.code === 403)
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have write access to both source and destination.'
           );
-        throw new UserError(`Failed to move file: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to move file: ${message}`);
       }
     },
   });
@@ -722,15 +738,17 @@ export function registerDriveTools(
 
         const copiedFile = response.data;
         return `Successfully created copy "${copiedFile.name}" (ID: ${copiedFile.id})\nLink: ${copiedFile.webViewLink}`;
-      } catch (error: any) {
-        log.error(`Error copying file: ${error.message || error}`);
-        if (error.code === 404)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error copying file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404)
           throw new UserError('Original file or destination folder not found. Check the IDs.');
-        if (error.code === 403)
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have read access to the original file and write access to the destination.'
           );
-        throw new UserError(`Failed to copy file: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to copy file: ${message}`);
       }
     },
   });
@@ -771,12 +789,14 @@ export function registerDriveTools(
 
         const file = response.data;
         return `Successfully renamed to "${file.name}" (ID: ${file.id})\nLink: ${file.webViewLink}`;
-      } catch (error: any) {
-        log.error(`Error renaming file: ${error.message || error}`);
-        if (error.code === 404) throw new UserError('File not found. Check the file ID.');
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error renaming file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('File not found. Check the file ID.');
+        if (code === 403)
           throw new UserError('Permission denied. Make sure you have write access to this file.');
-        throw new UserError(`Failed to rename file: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to rename file: ${message}`);
       }
     },
   });
@@ -835,12 +855,14 @@ export function registerDriveTools(
           });
           return `Moved ${isFolder ? 'folder' : 'file'} "${fileName}" to trash. It can be restored from the trash.`;
         }
-      } catch (error: any) {
-        log.error(`Error deleting file: ${error.message || error}`);
-        if (error.code === 404) throw new UserError('File not found. Check the file ID.');
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error deleting file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('File not found. Check the file ID.');
+        if (code === 403)
           throw new UserError('Permission denied. Make sure you have delete access to this file.');
-        throw new UserError(`Failed to delete file: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to delete file: ${message}`);
       }
     },
   });
@@ -911,21 +933,24 @@ export function registerDriveTools(
               },
             });
             result += `\n\nInitial content added to document.`;
-          } catch (contentError: any) {
-            log.warn(`Document created but failed to add initial content: ${contentError.message}`);
+          } catch (contentError: unknown) {
+            const contentMessage = getErrorMessage(contentError);
+            log.warn(`Document created but failed to add initial content: ${contentMessage}`);
             result += `\n\nDocument created but failed to add initial content. You can add content manually.`;
           }
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error creating document: ${error.message || error}`);
-        if (error.code === 404) throw new UserError('Parent folder not found. Check the folder ID.');
-        if (error.code === 403)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error creating document: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('Parent folder not found. Check the folder ID.');
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have write access to the destination folder.'
           );
-        throw new UserError(`Failed to create document: ${error.message || 'Unknown error'}`);
+        throw new UserError(`Failed to create document: ${message}`);
       }
     },
   });
@@ -1011,25 +1036,28 @@ export function registerDriveTools(
               const replacementCount = Object.keys(args.replacements).length;
               result += `\n\nApplied ${replacementCount} text replacement${replacementCount !== 1 ? 's' : ''} to the document.`;
             }
-          } catch (replacementError: any) {
+          } catch (replacementError: unknown) {
+            const replaceMessage = getErrorMessage(replacementError);
             log.warn(
-              `Document created but failed to apply replacements: ${replacementError.message}`
+              `Document created but failed to apply replacements: ${replaceMessage}`
             );
             result += `\n\nDocument created but failed to apply text replacements. You can make changes manually.`;
           }
         }
 
         return result;
-      } catch (error: any) {
-        log.error(`Error creating document from template: ${error.message || error}`);
-        if (error.code === 404)
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error creating document from template: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404)
           throw new UserError('Template document or parent folder not found. Check the IDs.');
-        if (error.code === 403)
+        if (code === 403)
           throw new UserError(
             'Permission denied. Make sure you have read access to the template and write access to the destination folder.'
           );
         throw new UserError(
-          `Failed to create document from template: ${error.message || 'Unknown error'}`
+          `Failed to create document from template: ${message}`
         );
       }
     },
