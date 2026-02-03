@@ -21,7 +21,7 @@ import { registerSlidesTools } from './tools/slides.tools.js';
 import { registerFormsTools } from './tools/forms.tools.js';
 
 // Import multi-account management
-import { initializeAccounts, getAccountClients } from './accounts.js';
+import { initializeAccounts, getAccountClients, getAccountEmail } from './accounts.js';
 
 // Import server wrapper for read-only mode
 import { createServerWithConfig, getServerConfigFromEnv } from './serverWrapper.js';
@@ -107,25 +107,25 @@ async function getFormsClient(accountName: string): Promise<forms_v1.Forms> {
 registerAccountsTools(server, ensureAccountsInitialized);
 
 // Register Google Docs tools
-registerDocsTools(server, getDocsClient, getDriveClient);
+registerDocsTools({ server, getDocsClient, getDriveClient, getAccountEmail });
 
 // Register Google Drive tools
-registerDriveTools(server, getDriveClient, getDocsClient);
+registerDriveTools({ server, getDriveClient, getDocsClient, getAccountEmail });
 
 // Register Google Sheets tools
-registerSheetsTools(server, getSheetsClient, getDriveClient);
+registerSheetsTools({ server, getSheetsClient, getDriveClient, getAccountEmail });
 
 // Register Gmail tools
-registerGmailTools(server, getGmailClient);
+registerGmailTools({ server, getGmailClient, getAccountEmail });
 
 // Register Calendar tools
-registerCalendarTools(server, getCalendarClient);
+registerCalendarTools({ server, getCalendarClient, getAccountEmail });
 
 // Register Slides tools (also needs Drive client for listing)
-registerSlidesTools(server, getSlidesClient, getDriveClient);
+registerSlidesTools({ server, getSlidesClient, getDriveClient, getAccountEmail });
 
 // Register Forms tools (also needs Drive client for listing)
-registerFormsTools(server, getFormsClient, getDriveClient);
+registerFormsTools({ server, getFormsClient, getDriveClient, getAccountEmail });
 
 // --- Server Startup ---
 async function startServer() {
