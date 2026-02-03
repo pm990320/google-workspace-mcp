@@ -12,6 +12,7 @@ import {
 
 // Import tool modules
 import { registerDocsTools } from './tools/docs.tools.js';
+import { registerMarkdownDocsTools } from './tools/markdownDocs.tools.js';
 import { registerDriveTools } from './tools/drive.tools.js';
 import { registerSheetsTools } from './tools/sheets.tools.js';
 import { registerAccountsTools } from './tools/accounts.tools.js';
@@ -108,6 +109,9 @@ registerAccountsTools(server, ensureAccountsInitialized);
 
 // Register Google Docs tools
 registerDocsTools({ server, getDocsClient, getDriveClient, getAccountEmail });
+
+// Register Markdown-based Docs tools (simplified editing for compatible documents)
+registerMarkdownDocsTools({ server, getDocsClient, getDriveClient, getAccountEmail });
 
 // Register Google Drive tools
 registerDriveTools({ server, getDriveClient, getDocsClient, getAccountEmail });

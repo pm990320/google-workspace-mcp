@@ -165,9 +165,7 @@ Line 2`;
     });
 
     it('should handle multiple formats', () => {
-      const { text, formats } = converter.parseInlineFormatting(
-        '**Bold** and *italic* and `code`'
-      );
+      const { text, formats } = converter.parseInlineFormatting('**Bold** and *italic* and `code`');
       assert.strictEqual(text, 'Bold and italic and code');
       assert.strictEqual(formats.length, 3);
     });
@@ -200,9 +198,7 @@ Line 2`;
 
     it('should generate bold formatting request', () => {
       const result = converter.convert('Hello **world**!');
-      const boldRequest = result.requests.find(
-        (r) => r.updateTextStyle?.textStyle?.bold === true
-      );
+      const boldRequest = result.requests.find((r) => r.updateTextStyle?.textStyle?.bold === true);
       assert.ok(boldRequest);
     });
 
@@ -234,10 +230,7 @@ Line 2`;
       const result = converter.convert('![Alt](https://example.com/img.png)');
       const imageRequest = result.requests.find((r) => r.insertInlineImage);
       assert.ok(imageRequest);
-      assert.strictEqual(
-        imageRequest.insertInlineImage.uri,
-        'https://example.com/img.png'
-      );
+      assert.strictEqual(imageRequest.insertInlineImage.uri, 'https://example.com/img.png');
     });
 
     it('should generate table insert request', () => {
@@ -291,8 +284,8 @@ This is a paragraph with **bold** and *italic*.
       assert.ok(result.requests.length > 5);
 
       // Should have heading requests
-      const headingRequests = result.requests.filter(
-        (r) => r.updateParagraphStyle?.paragraphStyle?.namedStyleType?.startsWith('HEADING_')
+      const headingRequests = result.requests.filter((r) =>
+        r.updateParagraphStyle?.paragraphStyle?.namedStyleType?.startsWith('HEADING_')
       );
       assert.strictEqual(headingRequests.length, 2);
 

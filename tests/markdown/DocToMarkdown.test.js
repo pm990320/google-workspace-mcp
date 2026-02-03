@@ -363,13 +363,17 @@ describe('DocToMarkdown', () => {
                 tableRows: [
                   {
                     tableCells: [
-                      { content: [{ paragraph: { elements: [{ textRun: { content: 'Name' } }] } }] },
+                      {
+                        content: [{ paragraph: { elements: [{ textRun: { content: 'Name' } }] } }],
+                      },
                       { content: [{ paragraph: { elements: [{ textRun: { content: 'Age' } }] } }] },
                     ],
                   },
                   {
                     tableCells: [
-                      { content: [{ paragraph: { elements: [{ textRun: { content: 'Alice' } }] } }] },
+                      {
+                        content: [{ paragraph: { elements: [{ textRun: { content: 'Alice' } }] } }],
+                      },
                       { content: [{ paragraph: { elements: [{ textRun: { content: '30' } }] } }] },
                     ],
                   },

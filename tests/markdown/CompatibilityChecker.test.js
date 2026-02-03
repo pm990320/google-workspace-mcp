@@ -413,7 +413,9 @@ describe('CompatibilityChecker', () => {
                     tableCells: [
                       {
                         tableCellStyle: { columnSpan: 2 },
-                        content: [{ paragraph: { elements: [{ textRun: { content: 'Merged' } }] } }],
+                        content: [
+                          { paragraph: { elements: [{ textRun: { content: 'Merged' } }] } },
+                        ],
                       },
                     ],
                   },
@@ -440,7 +442,9 @@ describe('CompatibilityChecker', () => {
                     tableCells: [
                       {
                         tableCellStyle: { rowSpan: 2 },
-                        content: [{ paragraph: { elements: [{ textRun: { content: 'Merged' } }] } }],
+                        content: [
+                          { paragraph: { elements: [{ textRun: { content: 'Merged' } }] } },
+                        ],
                       },
                     ],
                   },
