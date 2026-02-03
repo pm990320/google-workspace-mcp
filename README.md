@@ -480,27 +480,9 @@ The credentials path will be stored in the account config and used for all subse
 2. `~/.google-mcp/credentials/{accountName}.json`
 3. Global `~/.google-mcp/credentials.json`
 
-### Alternative: Service Account with Domain-Wide Delegation (Enterprise)
+### Service Account Authentication
 
-> **Note:** Service account authentication is not currently supported in the multi-account system. This section describes the planned feature. For now, please use the standard OAuth flow with `npx google-workspace-mcp accounts add <name>`.
-
-For Google Workspace organizations that need to access resources across the domain without individual user OAuth flows, service accounts with domain-wide delegation would allow:
-
-- Accessing any user's documents, Gmail, Calendar, etc. by impersonating them
-- Automated workflows without interactive OAuth consent
-- Centralized credential management for enterprise deployments
-
-**Required scopes for domain-wide delegation:**
-- `https://www.googleapis.com/auth/documents`
-- `https://www.googleapis.com/auth/drive`
-- `https://www.googleapis.com/auth/spreadsheets`
-- `https://www.googleapis.com/auth/gmail.modify`
-- `https://www.googleapis.com/auth/calendar`
-- `https://www.googleapis.com/auth/presentations`
-- `https://www.googleapis.com/auth/forms.body`
-- `https://www.googleapis.com/auth/forms.responses.readonly`
-
-If you need service account support, please [open an issue](https://github.com/zueai/google-workspace-mcp/issues) describing your use case.
+Service account authentication is not currently supported. Please use the standard OAuth flow with `npx google-workspace-mcp accounts add <name>`.
 
 ### Step 6: Configure Claude Desktop (Optional)
 
