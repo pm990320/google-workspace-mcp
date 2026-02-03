@@ -27,9 +27,17 @@ return { red: r, green: g, blue: b };
 
 // --- Zod Schema Fragments for Reusability ---
 
+// Account parameter - REQUIRED for all tools (no default account)
+export const AccountParameter = z.object({
+  account: z.string().min(1).describe('The name of the Google account to use. Use listAccounts to see available accounts.'),
+});
+
 export const DocumentIdParameter = z.object({
 documentId: z.string().describe('The ID of the Google Document (from the URL).'),
 });
+
+// Combined parameter for tools that need both account and document ID
+export const AccountDocumentParameters = AccountParameter.merge(DocumentIdParameter);
 
 export const RangeParameters = z.object({
 startIndex: z.number().int().min(1).describe('The starting index of the text range (inclusive, starts from 1).'),
@@ -96,7 +104,7 @@ export type ParagraphStyleArgs = z.infer<typeof ParagraphStyleParameters>;
 
 // --- Combination Schemas for Tools ---
 
-export const ApplyTextStyleToolParameters = DocumentIdParameter.extend({
+export const ApplyTextStyleToolParameters = AccountDocumentParameters.extend({
 // Target EITHER by range OR by finding text
 target: z.union([
 RangeParameters,
@@ -109,7 +117,7 @@ styleArgs => Object.values(styleArgs).some(v => v !== undefined),
 });
 export type ApplyTextStyleToolArgs = z.infer<typeof ApplyTextStyleToolParameters>;
 
-export const ApplyParagraphStyleToolParameters = DocumentIdParameter.extend({
+export const ApplyParagraphStyleToolParameters = AccountDocumentParameters.extend({
 // Target EITHER by range OR by finding text (tool logic needs to find paragraph boundaries)
 target: z.union([
 RangeParameters, // User provides paragraph start/end (less likely)
