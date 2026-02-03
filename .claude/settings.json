@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npm run lint:fix 2>/dev/null || true",
+            "command": "npm run lint 2>/dev/null || true",
             "timeout": 60
           }
         ]

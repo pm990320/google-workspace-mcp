@@ -1,6 +1,14 @@
 // src/types.ts
 import { z } from 'zod';
-import { type docs_v1, type drive_v3, type gmail_v1, type slides_v1, type forms_v1, type sheets_v4, type calendar_v3 } from 'googleapis';
+import {
+  type docs_v1,
+  type drive_v3,
+  type gmail_v1,
+  type slides_v1,
+  type forms_v1,
+  type sheets_v4,
+  type calendar_v3,
+} from 'googleapis';
 import { type FastMCP } from 'fastmcp';
 
 // --- FastMCP Server Types ---
@@ -231,10 +239,9 @@ export const ApplyTextStyleToolParameters = AccountDocumentParameters.extend({
   target: z
     .union([RangeParameters, TextFindParameter])
     .describe('Specify the target range either by start/end indices or by finding specific text.'),
-  style: TextStyleParameters.refine(
-    (styleArgs) => Object.keys(styleArgs).length > 0,
-    { message: 'At least one text style option must be provided.' }
-  ).describe('The text styling to apply.'),
+  style: TextStyleParameters.refine((styleArgs) => Object.keys(styleArgs).length > 0, {
+    message: 'At least one text style option must be provided.',
+  }).describe('The text styling to apply.'),
 });
 export type ApplyTextStyleToolArgs = z.infer<typeof ApplyTextStyleToolParameters>;
 
@@ -256,10 +263,9 @@ export const ApplyParagraphStyleToolParameters = AccountDocumentParameters.exten
     .describe(
       'Specify the target paragraph either by start/end indices, by finding text within it, or by providing an index within it.'
     ),
-  style: ParagraphStyleParameters.refine(
-    (styleArgs) => Object.keys(styleArgs).length > 0,
-    { message: 'At least one paragraph style option must be provided.' }
-  ).describe('The paragraph styling to apply.'),
+  style: ParagraphStyleParameters.refine((styleArgs) => Object.keys(styleArgs).length > 0, {
+    message: 'At least one paragraph style option must be provided.',
+  }).describe('The paragraph styling to apply.'),
 });
 export type ApplyParagraphStyleToolArgs = z.infer<typeof ApplyParagraphStyleToolParameters>;
 

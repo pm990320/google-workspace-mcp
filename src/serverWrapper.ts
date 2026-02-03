@@ -24,8 +24,10 @@ function enhanceErrorMessage(error: unknown): string {
 /**
  * Tool definition with annotations for read-only detection
  */
-interface ToolWithAnnotations<T extends FastMCPSessionAuth, Params extends ToolParameters>
-  extends Tool<T, Params> {
+interface ToolWithAnnotations<
+  T extends FastMCPSessionAuth,
+  Params extends ToolParameters,
+> extends Tool<T, Params> {
   annotations?: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
@@ -44,10 +46,7 @@ function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extend
 ): ToolWithAnnotations<T, Params> {
   const originalExecute = tool.execute;
 
-  const wrappedExecute = async (
-    args: unknown,
-    context: Context<T>
-  ): Promise<unknown> => {
+  const wrappedExecute = async (args: unknown, context: Context<T>): Promise<unknown> => {
     try {
       return await (originalExecute as (args: unknown, context: Context<T>) => Promise<unknown>)(
         args,
@@ -89,10 +88,7 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
     // In read-only mode, block non-read-only tools
     if (config.readOnly && !isReadOnly) {
       const toolName = tool.name;
-      const blockedExecute = (
-        _args: unknown,
-        _context: Context<T>
-      ): Promise<string> => {
+      const blockedExecute = (_args: unknown, _context: Context<T>): Promise<string> => {
         return Promise.reject(
           new Error(
             `Tool "${toolName}" is disabled: server is running in read-only mode. ` +

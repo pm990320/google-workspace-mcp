@@ -15,10 +15,7 @@ import { type OAuth2Client, type Credentials } from 'google-auth-library';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as http from 'http';
-import {
-  type OAuthCredentialsFile,
-  type ParsedOAuthCredentials,
-} from './types.js';
+import { type OAuthCredentialsFile, type ParsedOAuthCredentials } from './types.js';
 
 // --- Configuration paths ---
 const CONFIG_DIR = path.join(process.env.HOME || '~', '.google-mcp');
@@ -331,15 +328,17 @@ export async function getTokenInfo(accountName: string): Promise<{
       email: tokenInfo.data.email || undefined,
       scopes: tokenInfo.data.scope?.split(' ') ?? [],
       expiry_date: credentials.expiry_date || undefined,
-      access_token_preview: credentials.access_token ?
-        `${credentials.access_token.substring(0, 20)}...` : undefined,
+      access_token_preview: credentials.access_token
+        ? `${credentials.access_token.substring(0, 20)}...`
+        : undefined,
     };
   } catch (_error: unknown) {
     // If tokeninfo fails, return what we have from credentials
     return {
       expiry_date: credentials.expiry_date || undefined,
-      access_token_preview: credentials.access_token ?
-        `${credentials.access_token.substring(0, 20)}...` : undefined,
+      access_token_preview: credentials.access_token
+        ? `${credentials.access_token.substring(0, 20)}...`
+        : undefined,
       scopes: [], // Can't determine scopes without tokeninfo
     };
   }
@@ -471,70 +470,70 @@ export async function completeAddAccount(
 
     const server = http.createServer((req, res) => {
       void (async () => {
-      try {
-        const url = new URL(req.url ?? '', redirectUri);
-        const code = url.searchParams.get('code');
+        try {
+          const url = new URL(req.url ?? '', redirectUri);
+          const code = url.searchParams.get('code');
 
-        if (code) {
-          res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
-          res.end(
-            `<html><body><h1>Authentication successful for "${accountName}"!</h1><p>You can close this window.</p></body></html>`
-          );
+          if (code) {
+            res.writeHead(200, { 'Content-Type': 'text/html', Connection: 'close' });
+            res.end(
+              `<html><body><h1>Authentication successful for "${accountName}"!</h1><p>You can close this window.</p></body></html>`
+            );
 
-          // Close server, clear timeout, and destroy all connections
-          clearTimeout(timeout.id);
-          server.close();
-          connections.forEach((conn) => conn.destroy());
+            // Close server, clear timeout, and destroy all connections
+            clearTimeout(timeout.id);
+            server.close();
+            connections.forEach((conn) => conn.destroy());
 
-          const { tokens } = await oAuth2Client.getToken(code);
-          oAuth2Client.setCredentials(tokens);
+            const { tokens } = await oAuth2Client.getToken(code);
+            oAuth2Client.setCredentials(tokens);
 
-          // Get user email
-          const oauth2 = google.oauth2({ version: 'v2', auth: oAuth2Client });
-          let email: string | undefined;
-          try {
-            const userInfo = await oauth2.userinfo.get();
-            email = userInfo.data.email || undefined;
-          } catch {
-            // Email fetch failed, continue without it
+            // Get user email
+            const oauth2 = google.oauth2({ version: 'v2', auth: oAuth2Client });
+            let email: string | undefined;
+            try {
+              const userInfo = await oauth2.userinfo.get();
+              email = userInfo.data.email || undefined;
+            } catch {
+              // Email fetch failed, continue without it
+            }
+
+            // Save token
+            const tokenPath = await saveTokenForAccount(accountName, oAuth2Client);
+
+            // Update config - include credentialsPath if it was specified
+            const config = await loadAccountsConfig();
+            const accountConfig: AccountConfig = {
+              name: accountName,
+              email,
+              tokenPath,
+              ...(credentialsPath && { credentialsPath }),
+              addedAt: new Date().toISOString(),
+            };
+            // eslint-disable-next-line security/detect-object-injection -- accountName validated at function entry
+            config.accounts[accountName] = accountConfig;
+            await saveAccountsConfig(config);
+
+            resolve(accountConfig);
+          } else {
+            const error = url.searchParams.get('error');
+            res.writeHead(400, { 'Content-Type': 'text/html', Connection: 'close' });
+            res.end(
+              `<html><body><h1>Authentication failed</h1><p>${error || 'No code received'}</p></body></html>`
+            );
+            clearTimeout(timeout.id);
+            server.close();
+            connections.forEach((conn) => conn.destroy());
+            reject(new Error(error || 'No authorization code received'));
           }
-
-          // Save token
-          const tokenPath = await saveTokenForAccount(accountName, oAuth2Client);
-
-          // Update config - include credentialsPath if it was specified
-          const config = await loadAccountsConfig();
-          const accountConfig: AccountConfig = {
-            name: accountName,
-            email,
-            tokenPath,
-            ...(credentialsPath && { credentialsPath }),
-            addedAt: new Date().toISOString(),
-          };
-          // eslint-disable-next-line security/detect-object-injection -- accountName validated at function entry
-          config.accounts[accountName] = accountConfig;
-          await saveAccountsConfig(config);
-
-          resolve(accountConfig);
-        } else {
-          const error = url.searchParams.get('error');
-          res.writeHead(400, { 'Content-Type': 'text/html', 'Connection': 'close' });
-          res.end(
-            `<html><body><h1>Authentication failed</h1><p>${error || 'No code received'}</p></body></html>`
-          );
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'text/html', Connection: 'close' });
+          res.end('<html><body><h1>Authentication failed</h1></body></html>');
           clearTimeout(timeout.id);
           server.close();
           connections.forEach((conn) => conn.destroy());
-          reject(new Error(error || 'No authorization code received'));
+          reject(err instanceof Error ? err : new Error(String(err)));
         }
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'text/html', 'Connection': 'close' });
-        res.end('<html><body><h1>Authentication failed</h1></body></html>');
-        clearTimeout(timeout.id);
-        server.close();
-        connections.forEach((conn) => conn.destroy());
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
       })();
     });
 
@@ -589,7 +588,7 @@ export async function removeAccount(accountName: string): Promise<void> {
   }
 
   // Remove from config using object rest spread instead of delete
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const { [accountName]: _removed, ...remainingAccounts } = config.accounts;
   config.accounts = remainingAccounts;
   await saveAccountsConfig(config);

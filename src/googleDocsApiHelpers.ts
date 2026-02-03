@@ -56,8 +56,7 @@ async function executeSingleBatch(
         `Invalid request sent to Google Docs API. Details: ${detailMsg || message}`
       );
     }
-    if (code === 404)
-      throw new UserError(`Document not found (ID: ${documentId}). Check the ID.`);
+    if (code === 404) throw new UserError(`Document not found (ID: ${documentId}). Check the ID.`);
     if (code === 403)
       throw new UserError(
         `Permission denied for document (ID: ${documentId}). Ensure the authenticated user has edit access.`
@@ -149,7 +148,13 @@ export async function findTextRange(
         // Handle paragraph elements
         if (element.paragraph?.elements) {
           element.paragraph.elements.forEach((pe: ParagraphElement) => {
-            if (pe.textRun?.content && pe.startIndex != null && pe.endIndex != null) {
+            if (
+              pe.textRun?.content &&
+              pe.startIndex !== null &&
+              pe.startIndex !== undefined &&
+              pe.endIndex !== null &&
+              pe.endIndex !== undefined
+            ) {
               const textContent = pe.textRun.content;
               fullText += textContent;
               segments.push({
@@ -274,8 +279,7 @@ export async function findTextRange(
       throw new UserError(`Document not found while searching text (ID: ${documentId}).`);
     if (code === 403)
       throw new UserError(`Permission denied while searching text in doc ${documentId}.`);
-    throw new Error(`Failed to retrieve doc for text searching: ${message}`
-    );
+    throw new Error(`Failed to retrieve doc for text searching: ${message}`);
   }
 }
 
@@ -307,8 +311,13 @@ export async function getParagraphRange(
       content: StructuralElement[]
     ): { startIndex: number; endIndex: number } | null => {
       for (const element of content) {
-        // Check if we have element boundaries defined (can be 0, so use != null)
-        if (element.startIndex != null && element.endIndex != null) {
+        // Check if we have element boundaries defined (can be 0, so check both null and undefined)
+        if (
+          element.startIndex !== null &&
+          element.startIndex !== undefined &&
+          element.endIndex !== null &&
+          element.endIndex !== undefined
+        ) {
           // Check if index is within this element's range first
           if (indexWithin >= element.startIndex && indexWithin < element.endIndex) {
             // If it's a paragraph, we've found our target
@@ -368,8 +377,7 @@ export async function getParagraphRange(
     );
     if (code === 404)
       throw new UserError(`Document not found while finding paragraph (ID: ${documentId}).`);
-    if (code === 403)
-      throw new UserError(`Permission denied while accessing doc ${documentId}.`);
+    if (code === 403) throw new UserError(`Permission denied while accessing doc ${documentId}.`);
     throw new Error(`Failed to find paragraph: ${message}`);
   }
 }

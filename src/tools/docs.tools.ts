@@ -340,7 +340,9 @@ export function registerDocsTools(
         if (code === 403)
           throw new UserError(`Permission denied for doc (ID: ${args.documentId}).`);
         // Extract detailed error information from Google API response
-        const responseData = apiError?.response?.data as { error?: { message?: string; code?: number } } | undefined;
+        const responseData = apiError?.response?.data as
+          | { error?: { message?: string; code?: number } }
+          | undefined;
         const errorDetails = responseData?.error?.message || message;
         const errorCode = responseData?.error?.code || code;
         throw new UserError(
@@ -531,7 +533,7 @@ export function registerDocsTools(
         result += isSingleTab ? ' (single-tab document)\n\n' : '\n\n';
 
         if (!isSingleTab) {
-          result += `**Tab Structure:**\n`;
+          result += '**Tab Structure:**\n';
           result += `${'─'.repeat(50)}\n\n`;
         }
 
@@ -542,7 +544,7 @@ export function registerDocsTools(
 
           // For single tab documents, show simplified info
           if (isSingleTab) {
-            result += `**Default Tab:**\n`;
+            result += '**Default Tab:**\n';
             result += `- Tab ID: ${tabProperties.tabId || 'Unknown'}\n`;
             result += `- Title: ${tabProperties.title || '(Untitled)'}\n`;
           } else {
@@ -572,7 +574,7 @@ export function registerDocsTools(
 
         // Add usage hint for multi-tab documents
         if (!isSingleTab) {
-          result += `\n💡 **Tip:** Use tab IDs with other tools to target specific tabs.`;
+          result += '\n💡 **Tip:** Use tab IDs with other tools to target specific tabs.';
         }
 
         return result;
@@ -810,7 +812,10 @@ export function registerDocsTools(
           }
         }
 
-        const range: docs_v1.Schema$Range = { startIndex: args.startIndex, endIndex: args.endIndex };
+        const range: docs_v1.Schema$Range = {
+          startIndex: args.startIndex,
+          endIndex: args.endIndex,
+        };
         if (args.tabId) {
           range.tabId = args.tabId;
         }
@@ -959,7 +964,7 @@ export function registerDocsTools(
           );
 
           if (!paragraphRange) {
-            throw new UserError(`Found the text but could not determine the paragraph boundaries.`);
+            throw new UserError('Found the text but could not determine the paragraph boundaries.');
           }
 
           startIndex = paragraphRange.startIndex;
@@ -1261,15 +1266,14 @@ export function registerDocsTools(
               log.info(`Will upload image to document's parent folder: ${parentFolderId}`);
             }
           } catch (folderError: unknown) {
-            const errorMsg = folderError instanceof Error ? folderError.message : String(folderError);
-            log.warn(
-              `Could not determine document's parent folder, using Drive root: ${errorMsg}`
-            );
+            const errorMsg =
+              folderError instanceof Error ? folderError.message : String(folderError);
+            log.warn(`Could not determine document's parent folder, using Drive root: ${errorMsg}`);
           }
         }
 
         // Upload the image to Drive
-        log.info(`Uploading image to Drive...`);
+        log.info('Uploading image to Drive...');
         const imageUrl = await GDocsHelpers.uploadImageToDrive(
           drive,
           args.localImagePath,
@@ -1295,13 +1299,9 @@ export function registerDocsTools(
         return `Successfully uploaded image to Drive and inserted it at index ${args.index}${sizeInfo}.\nImage URL: ${imageUrl}`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        log.error(
-          `Error uploading/inserting local image in doc ${args.documentId}: ${message}`
-        );
+        log.error(`Error uploading/inserting local image in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
-        throw new UserError(
-          `Failed to upload/insert local image: ${message}`
-        );
+        throw new UserError(`Failed to upload/insert local image: ${message}`);
       }
     },
   });
@@ -1336,12 +1336,10 @@ export function registerDocsTools(
           args.range?.startIndex,
           args.range?.endIndex
         );
-        return `Attempted to fix list formatting. Please review the document for accuracy.`;
+        return 'Attempted to fix list formatting. Please review the document for accuracy.';
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        log.error(
-          `Error fixing list formatting in doc ${args.documentId}: ${message}`
-        );
+        log.error(`Error fixing list formatting in doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
         if (error instanceof NotImplementedError) throw error; // Expected if helper not implemented
         throw new UserError(`Failed to fix list formatting: ${message}`);
@@ -1658,7 +1656,9 @@ export function registerDocsTools(
         const message = getErrorMessage(error);
         log.error(`Error resolving comment: ${message}`);
         const apiError = isGoogleApiError(error) ? error : null;
-        const responseData = apiError?.response?.data as { error?: { message?: string; code?: number } } | undefined;
+        const responseData = apiError?.response?.data as
+          | { error?: { message?: string; code?: number } }
+          | undefined;
         const errorDetails = responseData?.error?.message || message;
         const errorCode = responseData?.error?.code;
         throw new UserError(
@@ -1790,7 +1790,8 @@ export function registerDocsTools(
               data[key as keyof typeof data] !== undefined
           ),
         {
-          message: 'At least one formatting option (bold, italic, fontSize, etc.) must be provided.',
+          message:
+            'At least one formatting option (bold, italic, fontSize, etc.) must be provided.',
         }
       ),
     execute: async (args, { log }) => {
@@ -1840,9 +1841,7 @@ export function registerDocsTools(
         return `Successfully applied formatting to instance ${args.matchInstance} of "${args.textToFind}".`;
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        log.error(
-          `Error in formatMatchingText for doc ${args.documentId}: ${message}`
-        );
+        log.error(`Error in formatMatchingText for doc ${args.documentId}: ${message}`);
         if (error instanceof UserError) throw error;
         throw new UserError(`Failed to format text: ${message}`);
       }

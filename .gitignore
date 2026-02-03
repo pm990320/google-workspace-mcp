@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+*.tsbuildinfo
 
 # Credentials / Tokens (NEVER commit these)
 credentials.json
@@ -33,7 +34,6 @@ Thumbs.db
 *.tmp
 *.temp
 *.bak
-*.cjs
 
 # Repomix output
 repomix-output.txt.xml

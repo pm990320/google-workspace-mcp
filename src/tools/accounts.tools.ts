@@ -114,15 +114,20 @@ export function registerAccountsTools(
         const port = 3000 + Math.floor(Math.random() * 1000);
 
         // Start the OAuth flow in the background, passing the optional credentials path
-        const oauthPromise = completeAddAccount(args.name, port, args.credentialsPath, (authUrl) => {
-          // Store the session info
-          pendingOAuthSessions.set(args.name, {
-            port,
-            authUrl,
-            resolve: () => {},
-            reject: () => {},
-          });
-        });
+        const oauthPromise = completeAddAccount(
+          args.name,
+          port,
+          args.credentialsPath,
+          (authUrl) => {
+            // Store the session info
+            pendingOAuthSessions.set(args.name, {
+              port,
+              authUrl,
+              resolve: () => {},
+              reject: () => {},
+            });
+          }
+        );
 
         // Give it a moment to start the server and generate the URL
         await new Promise((resolve) => setTimeout(resolve, 500));

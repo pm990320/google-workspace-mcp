@@ -134,7 +134,9 @@ async function startServer() {
 
     if (serverConfig.readOnly) {
       console.error('⚠️  Starting Google Workspace MCP server in READ-ONLY mode...');
-      console.error('   Write operations are disabled. Use --read-only=false or remove the flag to enable writes.');
+      console.error(
+        '   Write operations are disabled. Use --read-only=false or remove the flag to enable writes.'
+      );
     } else {
       console.error('Starting Google Workspace MCP server...');
     }

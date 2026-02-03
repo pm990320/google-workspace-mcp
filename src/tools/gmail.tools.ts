@@ -208,12 +208,12 @@ export function registerGmailTools(
       if (args.cc) email += `Cc: ${args.cc}\r\n`;
       if (args.bcc) email += `Bcc: ${args.bcc}\r\n`;
       email += `Subject: ${args.subject}\r\n`;
-      email += `MIME-Version: 1.0\r\n`;
+      email += 'MIME-Version: 1.0\r\n';
 
       if (args.isHtml) {
-        email += `Content-Type: text/html; charset=utf-8\r\n`;
+        email += 'Content-Type: text/html; charset=utf-8\r\n';
       } else {
-        email += `Content-Type: text/plain; charset=utf-8\r\n`;
+        email += 'Content-Type: text/plain; charset=utf-8\r\n';
       }
 
       email += `\r\n${args.body}`;
@@ -283,7 +283,9 @@ export function registerGmailTools(
       const messages = listResponse.data.messages ?? [];
 
       // Get snippets for each message (filter ensures m.id is defined)
-      const messagesWithIds = messages.slice(0, 20).filter((m): m is typeof m & { id: string } => Boolean(m.id));
+      const messagesWithIds = messages
+        .slice(0, 20)
+        .filter((m): m is typeof m & { id: string } => Boolean(m.id));
       const results = await Promise.all(
         messagesWithIds.map(async (m) => {
           const msg = await gmail.users.messages.get({

@@ -58,7 +58,7 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
     if (isNodeError(error) && error.code === 'ENOENT') {
       console.error(`FATAL: Service account key file not found at path: ${serviceAccountPath}`);
       throw new Error(
-        `Service account key file not found. Please check the path in SERVICE_ACCOUNT_PATH.`
+        'Service account key file not found. Please check the path in SERVICE_ACCOUNT_PATH.'
       );
     }
     const message = error instanceof Error ? error.message : String(error);
@@ -136,38 +136,38 @@ async function authenticate(): Promise<OAuth2Client> {
     return new Promise((resolve, reject) => {
       const server = http.createServer((req, res) => {
         void (async () => {
-        try {
-          const url = new URL(req.url || '', `http://localhost:3000`);
-          const code = url.searchParams.get('code');
+          try {
+            const url = new URL(req.url || '', 'http://localhost:3000');
+            const code = url.searchParams.get('code');
 
-          if (code) {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(
-              '<html><body><h1>Authentication successful!</h1><p>You can close this window.</p></body></html>'
-            );
+            if (code) {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end(
+                '<html><body><h1>Authentication successful!</h1><p>You can close this window.</p></body></html>'
+              );
 
-            server.close();
+              server.close();
 
-            const { tokens } = await oAuth2Client.getToken(code);
-            oAuth2Client.setCredentials(tokens);
-            if (tokens.refresh_token) {
-              await saveCredentials(oAuth2Client);
+              const { tokens } = await oAuth2Client.getToken(code);
+              oAuth2Client.setCredentials(tokens);
+              if (tokens.refresh_token) {
+                await saveCredentials(oAuth2Client);
+              } else {
+                console.error('Did not receive refresh token. Token might expire.');
+              }
+              console.error('Authentication successful!');
+              resolve(oAuth2Client);
             } else {
-              console.error('Did not receive refresh token. Token might expire.');
+              res.writeHead(400, { 'Content-Type': 'text/html' });
+              res.end('<html><body><h1>Error: No code received</h1></body></html>');
             }
-            console.error('Authentication successful!');
-            resolve(oAuth2Client);
-          } else {
-            res.writeHead(400, { 'Content-Type': 'text/html' });
-            res.end('<html><body><h1>Error: No code received</h1></body></html>');
+          } catch (err) {
+            console.error('Error retrieving access token', err);
+            res.writeHead(500, { 'Content-Type': 'text/html' });
+            res.end('<html><body><h1>Authentication failed</h1></body></html>');
+            server.close();
+            reject(new Error('Authentication failed'));
           }
-        } catch (err) {
-          console.error('Error retrieving access token', err);
-          res.writeHead(500, { 'Content-Type': 'text/html' });
-          res.end('<html><body><h1>Authentication failed</h1></body></html>');
-          server.close();
-          reject(new Error('Authentication failed'));
-        }
         })();
       });
 

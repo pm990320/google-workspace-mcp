@@ -82,7 +82,9 @@ export function registerSheetsTools(
           'The name of the Google account to use. Use listAccounts to see available accounts.'
         ),
       spreadsheetId: z.string().describe('The ID of the Google Spreadsheet (from the URL).'),
-      range: z.string().describe('A1 notation range to write to (e.g., "A1:B2" or "Sheet1!A1:B2").'),
+      range: z
+        .string()
+        .describe('A1 notation range to write to (e.g., "A1:B2" or "Sheet1!A1:B2").'),
       values: z
         .array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
         .describe('2D array of values to write. Each inner array represents a row.'),
@@ -247,7 +249,7 @@ export function registerSheetsTools(
       try {
         const metadata = await SheetsHelpers.getSpreadsheetMetadata(sheets, args.spreadsheetId);
 
-        let result = `**Spreadsheet Information:**\n\n`;
+        let result = '**Spreadsheet Information:**\n\n';
         result += `**Title:** ${metadata.properties?.title || 'Untitled'}\n`;
         result += `**ID:** ${metadata.spreadsheetId}\n`;
         result += `**URL:** https://docs.google.com/spreadsheets/d/${metadata.spreadsheetId}\n\n`;
@@ -260,9 +262,9 @@ export function registerSheetsTools(
           result += `   - Sheet ID: ${props?.sheetId}\n`;
           result += `   - Grid: ${props?.gridProperties?.rowCount || 0} rows x ${props?.gridProperties?.columnCount || 0} columns\n`;
           if (props?.hidden) {
-            result += `   - Status: Hidden\n`;
+            result += '   - Status: Hidden\n';
           }
-          result += `\n`;
+          result += '\n';
         });
 
         return result;
@@ -386,11 +388,12 @@ export function registerSheetsTools(
               args.initialData,
               'USER_ENTERED'
             );
-            result += `\n\nInitial data added to the spreadsheet.`;
+            result += '\n\nInitial data added to the spreadsheet.';
           } catch (contentError: unknown) {
             const contentMessage = getErrorMessage(contentError);
             log.warn(`Spreadsheet created but failed to add initial data: ${contentMessage}`);
-            result += `\n\nSpreadsheet created but failed to add initial data. You can add data manually.`;
+            result +=
+              '\n\nSpreadsheet created but failed to add initial data. You can add data manually.';
           }
         }
 

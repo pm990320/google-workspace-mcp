@@ -5,7 +5,7 @@ import { describe, it, mock } from 'node:test';
 
 describe('Text Range Finding', () => {
   // Test hypothesis 1: Text range finding works correctly
-  
+
   describe('findTextRange', () => {
     it('should find text within a single text run correctly', async () => {
       // Mock the docs.documents.get method to return a predefined structure
@@ -22,34 +22,32 @@ describe('Text Range Finding', () => {
                           startIndex: 1,
                           endIndex: 25,
                           textRun: {
-                            content: 'This is a test sentence.'
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }))
-        }
+                            content: 'This is a test sentence.',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          })),
+        },
       };
 
       // Test finding "test" in the sample text
       const result = await findTextRange(mockDocs, 'doc123', 'test', 1);
       assert.deepStrictEqual(result, { startIndex: 11, endIndex: 15 });
-      
+
       // Verify the docs.documents.get was called with the right parameters
       assert.strictEqual(mockDocs.documents.get.mock.calls.length, 1);
-      assert.deepStrictEqual(
-        mockDocs.documents.get.mock.calls[0].arguments[0],
-        {
-          documentId: 'doc123',
-          fields: 'body(content(paragraph(elements(startIndex,endIndex,textRun(content))),table,sectionBreak,tableOfContents,startIndex,endIndex))'
-        }
-      );
+      assert.deepStrictEqual(mockDocs.documents.get.mock.calls[0].arguments[0], {
+        documentId: 'doc123',
+        fields:
+          'body(content(paragraph(elements(startIndex,endIndex,textRun(content))),table,sectionBreak,tableOfContents,startIndex,endIndex))',
+      });
     });
-    
+
     it('should find the nth instance of text correctly', async () => {
       // Mock with a document that has repeated text
       const mockDocs = {
@@ -65,17 +63,17 @@ describe('Text Range Finding', () => {
                           startIndex: 1,
                           endIndex: 41,
                           textRun: {
-                            content: 'Test test test. This is a test sentence.'
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }))
-        }
+                            content: 'Test test test. This is a test sentence.',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          })),
+        },
       };
 
       // Find the 3rd instance of "test"
@@ -97,17 +95,17 @@ describe('Text Range Finding', () => {
                           startIndex: 1,
                           endIndex: 25,
                           textRun: {
-                            content: 'This is a sample sentence.'
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }))
-        }
+                            content: 'This is a sample sentence.',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          })),
+        },
       };
 
       // Try to find text that doesn't exist
@@ -129,31 +127,31 @@ describe('Text Range Finding', () => {
                           startIndex: 1,
                           endIndex: 6,
                           textRun: {
-                            content: 'This '
-                          }
+                            content: 'This ',
+                          },
                         },
                         {
                           startIndex: 6,
                           endIndex: 11,
                           textRun: {
-                            content: 'is a '
-                          }
+                            content: 'is a ',
+                          },
                         },
                         {
                           startIndex: 11,
                           endIndex: 20,
                           textRun: {
-                            content: 'test case'
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }))
-        }
+                            content: 'test case',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          })),
+        },
       };
 
       // Find text that spans runs: "a test"

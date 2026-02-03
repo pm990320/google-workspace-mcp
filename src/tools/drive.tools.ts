@@ -225,7 +225,9 @@ export function registerDriveTools(
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
-      log.info(`Getting recent Google Docs: ${args.maxResults} results, ${args.daysBack} days back`);
+      log.info(
+        `Getting recent Google Docs: ${args.maxResults} results, ${args.daysBack} days back`
+      );
 
       try {
         const cutoffDate = new Date();
@@ -309,10 +311,10 @@ export function registerDriveTools(
         const owner = file.owners?.[0];
         const lastModifier = file.lastModifyingUser;
 
-        let result = `**Document Information:**\n\n`;
+        let result = '**Document Information:**\n\n';
         result += `**Name:** ${file.name}\n`;
         result += `**ID:** ${file.id}\n`;
-        result += `**Type:** Google Document\n`;
+        result += '**Type:** Google Document\n';
         result += `**Created:** ${createdDate}\n`;
         result += `**Last Modified:** ${modifiedDate}\n`;
 
@@ -456,9 +458,9 @@ export function registerDriveTools(
         }
 
         if (!args.includeSubfolders) {
-          queryString += ` and mimeType!='application/vnd.google-apps.folder'`;
+          queryString += " and mimeType!='application/vnd.google-apps.folder'";
         } else if (!args.includeFiles) {
-          queryString += ` and mimeType='application/vnd.google-apps.folder'`;
+          queryString += " and mimeType='application/vnd.google-apps.folder'";
         }
 
         const response = await drive.files.list({
@@ -479,7 +481,9 @@ export function registerDriveTools(
         const folders = items.filter(
           (item) => item.mimeType === 'application/vnd.google-apps.folder'
         );
-        const files = items.filter((item) => item.mimeType !== 'application/vnd.google-apps.folder');
+        const files = items.filter(
+          (item) => item.mimeType !== 'application/vnd.google-apps.folder'
+        );
 
         if (folders.length > 0 && args.includeSubfolders) {
           result += `**Folders (${folders.length}):**\n`;
@@ -569,7 +573,7 @@ export function registerDriveTools(
         const owner = folder.owners?.[0];
         const lastModifier = folder.lastModifyingUser;
 
-        let result = `**Folder Information:**\n\n`;
+        let result = '**Folder Information:**\n\n';
         result += `**Name:** ${folder.name}\n`;
         result += `**ID:** ${folder.id}\n`;
         result += `**Created:** ${createdDate}\n`;
@@ -648,9 +652,10 @@ export function registerDriveTools(
         const fileName = fileInfo.data.name;
         const currentParents = fileInfo.data.parents ?? [];
 
-        const removeParents = args.removeFromAllParents && currentParents.length > 0
-          ? currentParents.join(',')
-          : undefined;
+        const removeParents =
+          args.removeFromAllParents && currentParents.length > 0
+            ? currentParents.join(',')
+            : undefined;
 
         const response = await drive.files.update({
           fileId: args.fileId,
@@ -888,7 +893,10 @@ export function registerDriveTools(
         .describe(
           'ID of folder where document should be created. If not provided, creates in Drive root.'
         ),
-      initialContent: z.string().optional().describe('Initial text content to add to the document.'),
+      initialContent: z
+        .string()
+        .optional()
+        .describe('Initial text content to add to the document.'),
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
@@ -928,11 +936,12 @@ export function registerDriveTools(
                 ],
               },
             });
-            result += `\n\nInitial content added to document.`;
+            result += '\n\nInitial content added to document.';
           } catch (contentError: unknown) {
             const contentMessage = getErrorMessage(contentError);
             log.warn(`Document created but failed to add initial content: ${contentMessage}`);
-            result += `\n\nDocument created but failed to add initial content. You can add content manually.`;
+            result +=
+              '\n\nDocument created but failed to add initial content. You can add content manually.';
           }
         }
 
@@ -1034,10 +1043,9 @@ export function registerDriveTools(
             }
           } catch (replacementError: unknown) {
             const replaceMessage = getErrorMessage(replacementError);
-            log.warn(
-              `Document created but failed to apply replacements: ${replaceMessage}`
-            );
-            result += `\n\nDocument created but failed to apply text replacements. You can make changes manually.`;
+            log.warn(`Document created but failed to apply replacements: ${replaceMessage}`);
+            result +=
+              '\n\nDocument created but failed to apply text replacements. You can make changes manually.';
           }
         }
 
@@ -1052,9 +1060,7 @@ export function registerDriveTools(
           throw new UserError(
             'Permission denied. Make sure you have read access to the template and write access to the destination folder.'
           );
-        throw new UserError(
-          `Failed to create document from template: ${message}`
-        );
+        throw new UserError(`Failed to create document from template: ${message}`);
       }
     },
   });

@@ -77,7 +77,9 @@ const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8')) as Pa
 
 program
   .name('google-workspace-mcp')
-  .description('Google Workspace MCP Server - Manage Google Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms')
+  .description(
+    'Google Workspace MCP Server - Manage Google Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms'
+  )
   .version(packageJson.version);
 
 // === MCP Server Command ===
@@ -169,9 +171,7 @@ program
   });
 
 // === Accounts Commands ===
-const accountsCmd = program
-  .command('accounts')
-  .description('Manage Google account authentication');
+const accountsCmd = program.command('accounts').description('Manage Google account authentication');
 
 accountsCmd
   .command('list')
@@ -210,7 +210,9 @@ accountsCmd
 
     // Validate name
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      console.error('Error: Account name must contain only letters, numbers, underscores, and hyphens.');
+      console.error(
+        'Error: Account name must contain only letters, numbers, underscores, and hyphens.'
+      );
       process.exit(1);
     }
 
@@ -218,9 +220,11 @@ accountsCmd
 
     // Check if account already exists
     const accounts = await listAccounts();
-    if (accounts.some(a => a.name === name)) {
+    if (accounts.some((a) => a.name === name)) {
       console.error(`Error: Account "${name}" already exists.`);
-      console.error('Use "google-workspace-mcp auth remove <name>" first if you want to re-add it.');
+      console.error(
+        'Use "google-workspace-mcp auth remove <name>" first if you want to re-add it.'
+      );
       process.exit(1);
     }
 
@@ -297,9 +301,7 @@ accountsCmd
     }
 
     // Filter to specific account if name provided
-    const accountsToTest = name
-      ? accounts.filter((a) => a.name === name)
-      : accounts;
+    const accountsToTest = name ? accounts.filter((a) => a.name === name) : accounts;
 
     if (name && accountsToTest.length === 0) {
       console.error(`Account "${name}" not found.`);
@@ -317,12 +319,33 @@ accountsCmd
 
     const services: { name: string; test: (clients: AccountClients) => Promise<unknown> }[] = [
       { name: 'Drive', test: async (clients) => await clients.drive.files.list({ pageSize: 1 }) },
-      { name: 'Docs', test: async (clients) => await handle404(clients.docs.documents.get({ documentId: 'test' })) },
-      { name: 'Sheets', test: async (clients) => await handle404(clients.sheets.spreadsheets.get({ spreadsheetId: 'test' })) },
-      { name: 'Gmail', test: async (clients) => await clients.gmail.users.labels.list({ userId: 'me' }) },
-      { name: 'Calendar', test: async (clients) => await clients.calendar.calendarList.list({ maxResults: 1 }) },
-      { name: 'Slides', test: async (clients) => await handle404(clients.slides.presentations.get({ presentationId: 'test' })) },
-      { name: 'Forms', test: async (clients) => await handle404(clients.forms.forms.get({ formId: 'test' })) },
+      {
+        name: 'Docs',
+        test: async (clients) =>
+          await handle404(clients.docs.documents.get({ documentId: 'test' })),
+      },
+      {
+        name: 'Sheets',
+        test: async (clients) =>
+          await handle404(clients.sheets.spreadsheets.get({ spreadsheetId: 'test' })),
+      },
+      {
+        name: 'Gmail',
+        test: async (clients) => await clients.gmail.users.labels.list({ userId: 'me' }),
+      },
+      {
+        name: 'Calendar',
+        test: async (clients) => await clients.calendar.calendarList.list({ maxResults: 1 }),
+      },
+      {
+        name: 'Slides',
+        test: async (clients) =>
+          await handle404(clients.slides.presentations.get({ presentationId: 'test' })),
+      },
+      {
+        name: 'Forms',
+        test: async (clients) => await handle404(clients.forms.forms.get({ formId: 'test' })),
+      },
     ];
 
     let totalIssues = 0;
@@ -341,7 +364,11 @@ accountsCmd
           } catch (error: unknown) {
             accountIssues++;
             const message = getErrorMessage(error);
-            if (message.includes('insufficient') || message.includes('permission') || message.includes('403')) {
+            if (
+              message.includes('insufficient') ||
+              message.includes('permission') ||
+              message.includes('403')
+            ) {
               console.log(`   ❌ ${service.name}: Permission denied`);
             } else if (message.includes('401') || message.includes('invalid_grant')) {
               console.log(`   ❌ ${service.name}: Token expired or revoked`);
@@ -375,9 +402,7 @@ accountsCmd
   });
 
 // === Config Commands ===
-const configCmd = program
-  .command('config')
-  .description('View configuration information');
+const configCmd = program.command('config').description('View configuration information');
 
 configCmd
   .command('path')
