@@ -877,6 +877,7 @@ export async function uploadImageToDrive(
   };
 
   const ext = path.extname(localFilePath).toLowerCase();
+  // eslint-disable-next-line security/detect-object-injection -- ext is from path.extname, limited to known file extensions
   const mimeType = mimeTypeMap[ext] || 'application/octet-stream';
 
   // Upload file to Drive

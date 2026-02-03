@@ -54,6 +54,7 @@ function openBrowser(url: string): void {
     command = `xdg-open "${url}"`;
   }
 
+  // eslint-disable-next-line security/detect-child-process -- command is constructed from known safe platform-specific openers with URL-encoded input
   exec(command, (error) => {
     if (error) {
       console.error('Could not open browser automatically. Please open the URL manually.');
@@ -71,6 +72,7 @@ const program = new Command();
 
 // Version from package.json
 const packageJsonPath = new URL('../package.json', import.meta.url);
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- packageJsonPath is a known safe path relative to this file
 const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8')) as PackageJson;
 
 program

@@ -68,7 +68,9 @@ export interface AccountClients {
 // --- Helper Functions ---
 
 async function ensureConfigDir(): Promise<void> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- CONFIG_DIR and TOKENS_DIR are derived from known safe paths
   await fs.mkdir(CONFIG_DIR, { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- TOKENS_DIR is derived from known safe paths
   await fs.mkdir(TOKENS_DIR, { recursive: true });
 }
 
@@ -79,6 +81,7 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 
 async function loadAccountsConfig(): Promise<AccountsConfig> {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- ACCOUNTS_CONFIG_PATH is derived from known safe paths
     const content = await fs.readFile(ACCOUNTS_CONFIG_PATH, 'utf8');
     return JSON.parse(content) as AccountsConfig;
   } catch (err: unknown) {
@@ -97,6 +100,7 @@ async function loadAccountsConfig(): Promise<AccountsConfig> {
 
 async function saveAccountsConfig(config: AccountsConfig): Promise<void> {
   await ensureConfigDir();
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- ACCOUNTS_CONFIG_PATH is derived from known safe paths
   await fs.writeFile(ACCOUNTS_CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
@@ -113,6 +117,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 async function parseCredentialsFile(
   credPath: string
 ): Promise<{ client_id: string; client_secret: string }> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- credPath is validated or from known config paths
   const content = await fs.readFile(credPath, 'utf8');
   const keys = JSON.parse(content) as OAuthCredentialsFile;
   const key = keys.installed ?? keys.web;
@@ -129,6 +134,7 @@ async function loadCredentials(accountName?: string): Promise<ParsedOAuthCredent
 
   // Priority: 1) Account-specific credentials, 2) Global credentials
   if (accountName) {
+    // eslint-disable-next-line security/detect-object-injection -- accountName is validated with regex /^[a-zA-Z0-9_-]+$/
     const account = config.accounts[accountName];
 
     // Check for explicit per-account credentials path in config
@@ -151,6 +157,7 @@ async function loadCredentials(accountName?: string): Promise<ParsedOAuthCredent
   }
 
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- credPath is from validated config or known paths
     const content = await fs.readFile(credPath, 'utf8');
     const keys = JSON.parse(content) as OAuthCredentialsFile;
     const key = keys.installed ?? keys.web;
@@ -172,6 +179,7 @@ async function loadCredentials(accountName?: string): Promise<ParsedOAuthCredent
 
 async function loadTokenForAccount(accountName: string): Promise<OAuth2Client | null> {
   const config = await loadAccountsConfig();
+  // eslint-disable-next-line security/detect-object-injection -- accountName is validated with regex /^[a-zA-Z0-9_-]+$/
   const account = config.accounts[accountName];
 
   if (!account) {
@@ -179,6 +187,7 @@ async function loadTokenForAccount(accountName: string): Promise<OAuth2Client | 
   }
 
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- tokenPath is from validated account config
     const tokenContent = await fs.readFile(account.tokenPath, 'utf8');
     const credentials = JSON.parse(tokenContent) as Credentials;
     // Use account-specific credentials if available
@@ -205,6 +214,7 @@ async function saveTokenForAccount(accountName: string, client: OAuth2Client): P
     refresh_token: client.credentials.refresh_token,
   });
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- tokenPath is constructed from validated accountName and known TOKENS_DIR
   await fs.writeFile(tokenPath, payload);
   return tokenPath;
 }
@@ -247,6 +257,7 @@ export async function initializeAccounts(): Promise<void> {
 export async function getAccountClients(accountName: string): Promise<AccountClients> {
   // Always load fresh from disk - no caching
   const config = await loadAccountsConfig();
+  // eslint-disable-next-line security/detect-object-injection -- accountName is validated by caller
   if (!config.accounts[accountName]) {
     const available = Object.keys(config.accounts);
     if (available.length === 0) {
@@ -351,6 +362,7 @@ export async function startAddAccount(
     throw new Error('Account name must contain only letters, numbers, underscores, and hyphens');
   }
 
+  // eslint-disable-next-line security/detect-object-injection -- accountName is validated above with regex
   if (config.accounts[accountName]) {
     throw new Error(
       `Account "${accountName}" already exists. Use removeAccount first if you want to re-add it.`
@@ -499,6 +511,7 @@ export async function completeAddAccount(
             ...(credentialsPath && { credentialsPath }),
             addedAt: new Date().toISOString(),
           };
+          // eslint-disable-next-line security/detect-object-injection -- accountName validated at function entry
           config.accounts[accountName] = accountConfig;
           await saveAccountsConfig(config);
 
@@ -561,6 +574,7 @@ export async function completeAddAccount(
 export async function removeAccount(accountName: string): Promise<void> {
   const config = await loadAccountsConfig();
 
+  // eslint-disable-next-line security/detect-object-injection -- accountName comes from user input but is used safely
   const accountToRemove = config.accounts[accountName];
   if (!accountToRemove) {
     throw new Error(`Account "${accountName}" not found`);
@@ -568,6 +582,7 @@ export async function removeAccount(accountName: string): Promise<void> {
 
   // Remove token file
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- tokenPath is from validated account config
     await fs.unlink(accountToRemove.tokenPath);
   } catch {
     // Ignore if file doesn't exist

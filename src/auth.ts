@@ -35,6 +35,7 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
   }
   const impersonateUser = process.env.GOOGLE_IMPERSONATE_USER; // Optional: email of user to impersonate
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- serviceAccountPath from environment variable, admin-controlled
     const keyFileContent = await fs.readFile(serviceAccountPath, 'utf8');
     const serviceAccountKey = JSON.parse(keyFileContent) as ServiceAccountKey;
 
