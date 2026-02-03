@@ -1,16 +1,25 @@
 // src/googleDocsApiHelpers.ts
 import { docs_v1 } from 'googleapis';
 import { UserError } from 'fastmcp';
-import { TextStyleArgs, ParagraphStyleArgs, hexToRgbColor, NotImplementedError } from './types.js';
-
-type Docs = docs_v1.Docs; // Alias for convenience
+import {
+  TextStyleArgs,
+  ParagraphStyleArgs,
+  hexToRgbColor,
+  NotImplementedError,
+  DocsClient,
+  StructuralElement,
+  ParagraphElement,
+  TableRow,
+  TableCell,
+} from './types.js';
+import { isGoogleApiError, getErrorMessage } from './errorHelpers.js';
 
 // --- Constants ---
 const MAX_BATCH_UPDATE_REQUESTS = 50; // Google API limits batch size
 
 // --- Core Helper to Execute Batch Updates ---
 export async function executeBatchUpdate(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   requests: docs_v1.Schema$Request[]
 ): Promise<docs_v1.Schema$BatchUpdateDocumentResponse> {
@@ -32,38 +41,42 @@ export async function executeBatchUpdate(
       requestBody: { requests },
     });
     return response.data;
-  } catch (error: any) {
-    console.error(
-      `Google API batchUpdate Error for doc ${documentId}:`,
-      error.response?.data || error.message
-    );
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
+    const apiError = isGoogleApiError(error) ? error : null;
+    const code = apiError?.code;
+    const responseData = apiError?.response?.data;
+
+    console.error(`Google API batchUpdate Error for doc ${documentId}:`, responseData || message);
+
     // Translate common API errors to UserErrors
-    if (error.code === 400 && error.message.includes('Invalid requests')) {
+    if (code === 400 && message.includes('Invalid requests')) {
       // Try to extract more specific info if available
-      const details = error.response?.data?.error?.details;
+      const details = (responseData as { error?: { details?: Array<{ description?: string }> } })
+        ?.error?.details;
       let detailMsg = '';
       if (details && Array.isArray(details)) {
         detailMsg = details.map((d) => d.description || JSON.stringify(d)).join('; ');
       }
       throw new UserError(
-        `Invalid request sent to Google Docs API. Details: ${detailMsg || error.message}`
+        `Invalid request sent to Google Docs API. Details: ${detailMsg || message}`
       );
     }
-    if (error.code === 404)
+    if (code === 404)
       throw new UserError(`Document not found (ID: ${documentId}). Check the ID.`);
-    if (error.code === 403)
+    if (code === 403)
       throw new UserError(
         `Permission denied for document (ID: ${documentId}). Ensure the authenticated user has edit access.`
       );
     // Generic internal error for others
-    throw new Error(`Google API Error (${error.code}): ${error.message}`);
+    throw new Error(`Google API Error (${code}): ${message}`);
   }
 }
 
 // --- Text Finding Helper ---
 // This improved version is more robust in handling various text structure scenarios
 export async function findTextRange(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   textToFind: string,
   instance: number = 1
@@ -87,16 +100,16 @@ export async function findTextRange(
     const segments: { text: string; start: number; end: number }[] = [];
 
     // Process all content elements, including structural ones
-    const collectTextFromContent = (content: any[]) => {
+    const collectTextFromContent = (content: StructuralElement[]) => {
       content.forEach((element) => {
         // Handle paragraph elements
         if (element.paragraph?.elements) {
-          element.paragraph.elements.forEach((pe: any) => {
-            if (pe.textRun?.content && pe.startIndex !== undefined && pe.endIndex !== undefined) {
-              const content = pe.textRun.content;
-              fullText += content;
+          element.paragraph.elements.forEach((pe: ParagraphElement) => {
+            if (pe.textRun?.content && pe.startIndex != null && pe.endIndex != null) {
+              const textContent = pe.textRun.content;
+              fullText += textContent;
               segments.push({
-                text: content,
+                text: textContent,
                 start: pe.startIndex,
                 end: pe.endIndex,
               });
@@ -106,9 +119,9 @@ export async function findTextRange(
 
         // Handle table elements - this is simplified and might need expansion
         if (element.table && element.table.tableRows) {
-          element.table.tableRows.forEach((row: any) => {
+          element.table.tableRows.forEach((row: TableRow) => {
             if (row.tableCells) {
-              row.tableCells.forEach((cell: any) => {
+              row.tableCells.forEach((cell: TableCell) => {
                 if (cell.content) {
                   collectTextFromContent(cell.content);
                 }
@@ -209,16 +222,15 @@ export async function findTextRange(
       `Could not find instance ${instance} of text "${textToFind}" in document ${documentId}`
     );
     return null; // Instance not found or mapping failed for all attempts
-  } catch (error: any) {
-    console.error(
-      `Error finding text "${textToFind}" in doc ${documentId}: ${error.message || 'Unknown error'}`
-    );
-    if (error.code === 404)
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    console.error(`Error finding text "${textToFind}" in doc ${documentId}: ${message}`);
+    if (code === 404)
       throw new UserError(`Document not found while searching text (ID: ${documentId}).`);
-    if (error.code === 403)
+    if (code === 403)
       throw new UserError(`Permission denied while searching text in doc ${documentId}.`);
-    throw new Error(
-      `Failed to retrieve doc for text searching: ${error.message || 'Unknown error'}`
+    throw new Error(`Failed to retrieve doc for text searching: ${message}`
     );
   }
 }
@@ -226,7 +238,7 @@ export async function findTextRange(
 // --- Paragraph Boundary Helper ---
 // Enhanced version to handle document structural elements more robustly
 export async function getParagraphRange(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   indexWithin: number
 ): Promise<{ startIndex: number; endIndex: number } | null> {
@@ -248,11 +260,11 @@ export async function getParagraphRange(
     // Find paragraph containing the index
     // We'll look at all structural elements recursively
     const findParagraphInContent = (
-      content: any[]
+      content: StructuralElement[]
     ): { startIndex: number; endIndex: number } | null => {
       for (const element of content) {
-        // Check if we have element boundaries defined
-        if (element.startIndex !== undefined && element.endIndex !== undefined) {
+        // Check if we have element boundaries defined (can be 0, so use != null)
+        if (element.startIndex != null && element.endIndex != null) {
           // Check if index is within this element's range first
           if (indexWithin >= element.startIndex && indexWithin < element.endIndex) {
             // If it's a paragraph, we've found our target
@@ -304,15 +316,17 @@ export async function getParagraphRange(
     }
 
     return paragraphRange;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = getErrorMessage(error);
+    const code = isGoogleApiError(error) ? error.code : undefined;
     console.error(
-      `Error getting paragraph range for index ${indexWithin} in doc ${documentId}: ${error.message || 'Unknown error'}`
+      `Error getting paragraph range for index ${indexWithin} in doc ${documentId}: ${message}`
     );
-    if (error.code === 404)
+    if (code === 404)
       throw new UserError(`Document not found while finding paragraph (ID: ${documentId}).`);
-    if (error.code === 403)
+    if (code === 403)
       throw new UserError(`Permission denied while accessing doc ${documentId}.`);
-    throw new Error(`Failed to find paragraph: ${error.message || 'Unknown error'}`);
+    throw new Error(`Failed to find paragraph: ${message}`);
   }
 }
 
@@ -465,7 +479,7 @@ export function buildUpdateParagraphStyleRequest(
 // --- Specific Feature Helpers ---
 
 export async function createTable(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   rows: number,
   columns: number,
@@ -485,7 +499,7 @@ export async function createTable(
 }
 
 export async function insertText(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   text: string,
   index: number
@@ -502,10 +516,18 @@ export async function insertText(
 
 // --- Complex / Stubbed Helpers ---
 
+/** Style criteria for finding paragraphs */
+export interface StyleCriteria {
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  fontSize?: number;
+}
+
 export async function findParagraphsMatchingStyle(
-  _docs: Docs,
+  _docs: DocsClient,
   _documentId: string,
-  _styleCriteria: any // Define a proper type for criteria (e.g., { fontFamily: 'Arial', bold: true })
+  _styleCriteria: StyleCriteria
 ): Promise<{ startIndex: number; endIndex: number }[]> {
   // TODO: Implement logic
   // 1. Get document content with paragraph elements and their styles.
@@ -518,7 +540,7 @@ export async function findParagraphsMatchingStyle(
 }
 
 export async function detectAndFormatLists(
-  _docs: Docs,
+  _docs: DocsClient,
   _documentId: string,
   _startIndex?: number,
   _endIndex?: number
@@ -537,7 +559,7 @@ export async function detectAndFormatLists(
 }
 
 export async function addCommentHelper(
-  _docs: Docs,
+  _docs: DocsClient,
   _documentId: string,
   _text: string,
   _startIndex: number,
@@ -585,7 +607,7 @@ fields: 'id'
  * @returns Promise with batch update response
  */
 export async function insertInlineImage(
-  docs: Docs,
+  docs: DocsClient,
   documentId: string,
   imageUrl: string,
   index: number,
@@ -625,7 +647,7 @@ export async function insertInlineImage(
  * @returns Promise with the public webContentLink URL
  */
 export async function uploadImageToDrive(
-  drive: any, // drive_v3.Drive type
+  drive: import('googleapis').drive_v3.Drive,
   localFilePath: string,
   parentFolderId?: string
 ): Promise<string> {
@@ -653,7 +675,7 @@ export async function uploadImageToDrive(
   const mimeType = mimeTypeMap[ext] || 'application/octet-stream';
 
   // Upload file to Drive
-  const fileMetadata: any = {
+  const fileMetadata: import('googleapis').drive_v3.Schema$File = {
     name: fileName,
     mimeType: mimeType,
   };
@@ -758,10 +780,10 @@ export function getTabTextLength(documentTab: docs_v1.Schema$DocumentTab | undef
     return 0;
   }
 
-  documentTab.body.content.forEach((element: any) => {
+  documentTab.body.content.forEach((element: StructuralElement) => {
     // Handle paragraphs
     if (element.paragraph?.elements) {
-      element.paragraph.elements.forEach((pe: any) => {
+      element.paragraph.elements.forEach((pe: ParagraphElement) => {
         if (pe.textRun?.content) {
           totalLength += pe.textRun.content.length;
         }
@@ -770,10 +792,10 @@ export function getTabTextLength(documentTab: docs_v1.Schema$DocumentTab | undef
 
     // Handle tables
     if (element.table?.tableRows) {
-      element.table.tableRows.forEach((row: any) => {
-        row.tableCells?.forEach((cell: any) => {
-          cell.content?.forEach((cellElement: any) => {
-            cellElement.paragraph?.elements?.forEach((pe: any) => {
+      element.table.tableRows.forEach((row: TableRow) => {
+        row.tableCells?.forEach((cell: TableCell) => {
+          cell.content?.forEach((cellElement: StructuralElement) => {
+            cellElement.paragraph?.elements?.forEach((pe: ParagraphElement) => {
               if (pe.textRun?.content) {
                 totalLength += pe.textRun.content.length;
               }

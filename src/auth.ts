@@ -47,14 +47,17 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
       console.error('Service Account authentication successful!');
     }
     return auth;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
+  } catch (error: unknown) {
+    const isNodeError = (e: unknown): e is NodeJS.ErrnoException =>
+      e instanceof Error && 'code' in e;
+    if (isNodeError(error) && error.code === 'ENOENT') {
       console.error(`FATAL: Service account key file not found at path: ${serviceAccountPath}`);
       throw new Error(
         `Service account key file not found. Please check the path in SERVICE_ACCOUNT_PATH.`
       );
     }
-    console.error('FATAL: Error loading or authorizing the service account key:', error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('FATAL: Error loading or authorizing the service account key:', message);
     throw new Error(
       'Failed to authorize using the service account. Ensure the key file is valid and the path is correct.'
     );

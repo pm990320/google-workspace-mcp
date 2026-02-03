@@ -1,8 +1,11 @@
 // src/googleSheetsApiHelpers.ts
 import { sheets_v4 } from 'googleapis';
 import { UserError } from 'fastmcp';
+import { isGoogleApiError, getErrorMessage } from './errorHelpers.js';
+import { SheetsClient } from './types.js';
 
-type Sheets = sheets_v4.Sheets; // Alias for convenience
+/** Cell value type - can be string, number, boolean, or null */
+type CellValue = string | number | boolean | null;
 
 // --- Core Helper Functions ---
 
@@ -73,7 +76,7 @@ export function normalizeRange(range: string, sheetName?: string): string {
  * Reads values from a spreadsheet range
  */
 export async function readRange(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   range: string
 ): Promise<sheets_v4.Schema$ValueRange> {
@@ -83,16 +86,17 @@ export async function readRange(
       range,
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`
       );
     }
-    throw new UserError(`Failed to read range: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to read range: ${getErrorMessage(error)}`);
   }
 }
 
@@ -100,10 +104,10 @@ export async function readRange(
  * Writes values to a spreadsheet range
  */
 export async function writeRange(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   range: string,
-  values: any[][],
+  values: CellValue[][],
   valueInputOption: 'RAW' | 'USER_ENTERED' = 'USER_ENTERED'
 ): Promise<sheets_v4.Schema$UpdateValuesResponse> {
   try {
@@ -116,16 +120,17 @@ export async function writeRange(
       },
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
       );
     }
-    throw new UserError(`Failed to write range: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to write range: ${getErrorMessage(error)}`);
   }
 }
 
@@ -133,10 +138,10 @@ export async function writeRange(
  * Appends values to the end of a sheet
  */
 export async function appendValues(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   range: string,
-  values: any[][],
+  values: CellValue[][],
   valueInputOption: 'RAW' | 'USER_ENTERED' = 'USER_ENTERED'
 ): Promise<sheets_v4.Schema$AppendValuesResponse> {
   try {
@@ -150,16 +155,17 @@ export async function appendValues(
       },
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
       );
     }
-    throw new UserError(`Failed to append values: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to append values: ${getErrorMessage(error)}`);
   }
 }
 
@@ -167,7 +173,7 @@ export async function appendValues(
  * Clears values from a range
  */
 export async function clearRange(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   range: string
 ): Promise<sheets_v4.Schema$ClearValuesResponse> {
@@ -177,16 +183,17 @@ export async function clearRange(
       range,
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
       );
     }
-    throw new UserError(`Failed to clear range: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to clear range: ${getErrorMessage(error)}`);
   }
 }
 
@@ -194,7 +201,7 @@ export async function clearRange(
  * Gets spreadsheet metadata including sheet information
  */
 export async function getSpreadsheetMetadata(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string
 ): Promise<sheets_v4.Schema$Spreadsheet> {
   try {
@@ -203,16 +210,17 @@ export async function getSpreadsheetMetadata(
       includeGridData: false,
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`
       );
     }
-    throw new UserError(`Failed to get spreadsheet metadata: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to get spreadsheet metadata: ${getErrorMessage(error)}`);
   }
 }
 
@@ -220,7 +228,7 @@ export async function getSpreadsheetMetadata(
  * Creates a new sheet/tab in a spreadsheet
  */
 export async function addSheet(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   sheetTitle: string
 ): Promise<sheets_v4.Schema$BatchUpdateSpreadsheetResponse> {
@@ -240,16 +248,17 @@ export async function addSheet(
       },
     });
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
       );
     }
-    throw new UserError(`Failed to add sheet: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to add sheet: ${getErrorMessage(error)}`);
   }
 }
 
@@ -276,7 +285,7 @@ function parseRange(range: string): { sheetName: string | null; a1Range: string 
  * Note: This function requires the sheetId. For simplicity, we'll get it from the spreadsheet metadata.
  */
 export async function formatCells(
-  sheets: Sheets,
+  sheets: SheetsClient,
   spreadsheetId: string,
   range: string,
   format: {
@@ -407,37 +416,19 @@ export async function formatCells(
     });
 
     return response.data;
-  } catch (error: any) {
-    if (error.code === 404) {
+  } catch (error: unknown) {
+    const code = isGoogleApiError(error) ? error.code : undefined;
+    if (code === 404) {
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
-    if (error.code === 403) {
+    if (code === 403) {
       throw new UserError(
         `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
       );
     }
     if (error instanceof UserError) throw error;
-    throw new UserError(`Failed to format cells: ${error.message || 'Unknown error'}`);
+    throw new UserError(`Failed to format cells: ${getErrorMessage(error)}`);
   }
 }
 
-/**
- * Helper to convert hex color to RGB (0-1 range)
- */
-export function hexToRgb(hex: string): { red: number; green: number; blue: number } | null {
-  if (!hex) return null;
-  let hexClean = hex.startsWith('#') ? hex.slice(1) : hex;
-
-  if (hexClean.length === 3) {
-    hexClean = hexClean[0] + hexClean[0] + hexClean[1] + hexClean[1] + hexClean[2] + hexClean[2];
-  }
-  if (hexClean.length !== 6) return null;
-  const bigint = parseInt(hexClean, 16);
-  if (isNaN(bigint)) return null;
-
-  return {
-    red: ((bigint >> 16) & 255) / 255,
-    green: ((bigint >> 8) & 255) / 255,
-    blue: (bigint & 255) / 255,
-  };
-}
+// Note: hexToRgbColor is available from '../types.js' if needed for color conversions

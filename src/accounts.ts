@@ -68,12 +68,17 @@ async function ensureConfigDir(): Promise<void> {
   await fs.mkdir(TOKENS_DIR, { recursive: true });
 }
 
+/** Type guard for Node.js file system errors */
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
+}
+
 async function loadAccountsConfig(): Promise<AccountsConfig> {
   try {
     const content = await fs.readFile(ACCOUNTS_CONFIG_PATH, 'utf8');
-    return JSON.parse(content);
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
+    return JSON.parse(content) as AccountsConfig;
+  } catch (err: unknown) {
+    if (isNodeError(err) && err.code === 'ENOENT') {
       // Create default config
       const defaultConfig: AccountsConfig = {
         accounts: {},
@@ -139,8 +144,8 @@ async function loadCredentials(
       client_secret: key.client_secret,
       redirect_uris: key.redirect_uris || ['http://localhost:3000'],
     };
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
+  } catch (err: unknown) {
+    if (isNodeError(err) && err.code === 'ENOENT') {
       throw new Error(
         `Credentials file not found at ${credPath}. Please copy your OAuth credentials.json to this location.`
       );
@@ -300,7 +305,7 @@ export async function getTokenInfo(accountName: string): Promise<{
       access_token_preview: credentials.access_token ?
         `${credentials.access_token.substring(0, 20)}...` : undefined,
     };
-  } catch (error: any) {
+  } catch (_error: unknown) {
     // If tokeninfo fails, return what we have from credentials
     return {
       expiry_date: credentials.expiry_date || undefined,
@@ -441,8 +446,10 @@ export async function completeAddAccount(
 
   return new Promise((resolve, reject) => {
     // Track connections so we can destroy them when closing
-    const connections = new Set<any>();
-    let timeoutId: NodeJS.Timeout;
+    const connections = new Set<import('net').Socket>();
+    // Timeout ID will be assigned after server is created
+    // Using object wrapper to allow const declaration while still being mutable inside closure
+    const timeout: { id?: NodeJS.Timeout } = {};
 
     const server = http.createServer(async (req, res) => {
       try {
@@ -456,7 +463,7 @@ export async function completeAddAccount(
           );
 
           // Close server, clear timeout, and destroy all connections
-          clearTimeout(timeoutId);
+          clearTimeout(timeout.id);
           server.close();
           connections.forEach((conn) => conn.destroy());
 
@@ -495,7 +502,7 @@ export async function completeAddAccount(
           res.end(
             `<html><body><h1>Authentication failed</h1><p>${error || 'No code received'}</p></body></html>`
           );
-          clearTimeout(timeoutId);
+          clearTimeout(timeout.id);
           server.close();
           connections.forEach((conn) => conn.destroy());
           reject(new Error(error || 'No authorization code received'));
@@ -503,7 +510,7 @@ export async function completeAddAccount(
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'text/html', 'Connection': 'close' });
         res.end('<html><body><h1>Authentication failed</h1></body></html>');
-        clearTimeout(timeoutId);
+        clearTimeout(timeout.id);
         server.close();
         connections.forEach((conn) => conn.destroy());
         reject(err);
@@ -520,7 +527,7 @@ export async function completeAddAccount(
       console.error(`OAuth callback server listening on port ${port}`);
     });
 
-    server.on('error', (err: any) => {
+    server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         reject(new Error(`Port ${port} is in use. Please try again.`));
       } else {
@@ -529,7 +536,7 @@ export async function completeAddAccount(
     });
 
     // Timeout after 5 minutes
-    timeoutId = setTimeout(
+    timeout.id = setTimeout(
       () => {
         server.close();
         connections.forEach((conn) => conn.destroy());
