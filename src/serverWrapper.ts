@@ -37,32 +37,57 @@ interface ToolWithAnnotations<T extends FastMCPSessionAuth, Params extends ToolP
 }
 
 /**
- * Wraps a FastMCP server to enforce read-only mode based on tool annotations.
- * Tools with readOnlyHint: false (or undefined) will be blocked at runtime.
+ * Wraps a tool's execute function with error handling that adds help links
+ */
+function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extends ToolParameters>(
+  tool: ToolWithAnnotations<T, Params>
+): ToolWithAnnotations<T, Params> {
+  const originalExecute = tool.execute;
+
+  const wrappedExecute = async (
+    args: unknown,
+    context: Context<T>
+  ): Promise<unknown> => {
+    try {
+      return await (originalExecute as (args: unknown, context: Context<T>) => Promise<unknown>)(
+        args,
+        context
+      );
+    } catch (error) {
+      throw new Error(enhanceErrorMessage(error));
+    }
+  };
+
+  return {
+    ...tool,
+    execute: wrappedExecute as unknown as typeof tool.execute,
+  };
+}
+
+/**
+ * Wraps a FastMCP server to:
+ * 1. Add global error handling with help links to all tools
+ * 2. Enforce read-only mode based on tool annotations (if enabled)
  *
  * @param server - The FastMCP server instance
  * @param config - Server configuration
- * @returns The same server instance with addTool wrapped (if read-only mode is enabled)
+ * @returns The same server instance with addTool wrapped
  */
 export function createServerWithConfig<T extends FastMCPSessionAuth>(
   server: FastMCP<T>,
   config: ServerConfig
 ): FastMCP<T> {
-  if (!config.readOnly) {
-    return server; // No wrapping needed
-  }
-
   // Store original addTool method
   const originalAddTool = server.addTool.bind(server);
 
-  // Override addTool to wrap non-read-only tools
+  // Override addTool to wrap all tools with error handling (and read-only enforcement if configured)
   server.addTool = function <Params extends ToolParameters>(
     tool: ToolWithAnnotations<T, Params>
   ): void {
     const isReadOnly = tool.annotations?.readOnlyHint === true;
 
-    if (!isReadOnly) {
-      // Wrap the execute function to block write operations at runtime
+    // In read-only mode, block non-read-only tools
+    if (config.readOnly && !isReadOnly) {
       const toolName = tool.name;
       const blockedExecute = (
         _args: unknown,
@@ -71,22 +96,24 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
         return Promise.reject(
           new Error(
             `Tool "${toolName}" is disabled: server is running in read-only mode. ` +
-              `This tool would modify data. Restart the server without --read-only to enable write operations.`
+              `This tool would modify data. Restart the server without --read-only to enable write operations.${HELP_MESSAGE}`
           )
         );
       };
 
-      // Create a new tool object with the blocked execute function
       const blockedTool: ToolWithAnnotations<T, Params> = {
         ...tool,
         execute: blockedExecute as typeof tool.execute,
         description: `[READ-ONLY MODE - DISABLED] ${tool.description || ''}`,
       };
 
-      originalAddTool(blockedTool); return;
+      originalAddTool(blockedTool);
+      return;
     }
 
-    originalAddTool(tool);
+    // Wrap tool with error handler
+    const wrappedTool = wrapExecuteWithErrorHandler(tool);
+    originalAddTool(wrappedTool);
   };
 
   return server;
