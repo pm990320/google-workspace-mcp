@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 const CONFIG_DIR = path.join(process.env.HOME || '~', '.google-mcp');
 const ACCOUNTS_CONFIG_PATH = path.join(CONFIG_DIR, 'accounts.json');
 const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials.json');
+const CREDENTIALS_DIR = path.join(CONFIG_DIR, 'credentials');
 const TOKENS_DIR = path.join(CONFIG_DIR, 'tokens');
 
 const SCOPES = [
@@ -25,6 +26,7 @@ export interface AccountConfig {
   name: string;
   email?: string;
   tokenPath: string;
+  credentialsPath?: string;  // Optional per-account credentials file
   addedAt: string;
 }
 
@@ -77,15 +79,47 @@ async function saveAccountsConfig(): Promise<void> {
   await fs.writeFile(ACCOUNTS_CONFIG_PATH, JSON.stringify(accountsConfig, null, 2));
 }
 
-async function loadCredentials(): Promise<{ client_id: string; client_secret: string; redirect_uris: string[] }> {
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadCredentials(accountName?: string): Promise<{ client_id: string; client_secret: string; redirect_uris: string[] }> {
   const config = await loadAccountsConfig();
-  const credPath = config.credentialsPath || CREDENTIALS_PATH;
+  let credPath: string;
+
+  // Priority: 1) Account-specific credentials, 2) Global credentials
+  if (accountName) {
+    const account = config.accounts[accountName];
+
+    // Check for explicit per-account credentials path in config
+    if (account?.credentialsPath && await fileExists(account.credentialsPath)) {
+      credPath = account.credentialsPath;
+    }
+    // Check for credentials in the credentials directory by account name
+    else {
+      const accountCredPath = path.join(CREDENTIALS_DIR, `${accountName}.json`);
+      if (await fileExists(accountCredPath)) {
+        credPath = accountCredPath;
+      } else {
+        // Fall back to global credentials
+        credPath = config.credentialsPath || CREDENTIALS_PATH;
+      }
+    }
+  } else {
+    // No account specified, use global credentials
+    credPath = config.credentialsPath || CREDENTIALS_PATH;
+  }
 
   try {
     const content = await fs.readFile(credPath, 'utf8');
     const keys = JSON.parse(content);
     const key = keys.installed || keys.web;
-    if (!key) throw new Error("Could not find client secrets in credentials.json.");
+    if (!key) throw new Error(`Could not find client secrets in ${credPath}.`);
     return {
       client_id: key.client_id,
       client_secret: key.client_secret,
@@ -110,7 +144,8 @@ async function loadTokenForAccount(accountName: string): Promise<OAuth2Client | 
   try {
     const tokenContent = await fs.readFile(account.tokenPath, 'utf8');
     const credentials = JSON.parse(tokenContent);
-    const { client_id, client_secret, redirect_uris } = await loadCredentials();
+    // Use account-specific credentials if available
+    const { client_id, client_secret, redirect_uris } = await loadCredentials(accountName);
 
     const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     client.setCredentials(credentials);
@@ -124,7 +159,8 @@ async function saveTokenForAccount(accountName: string, client: OAuth2Client): P
   await ensureConfigDir();
   const tokenPath = path.join(TOKENS_DIR, `${accountName}.json`);
 
-  const { client_id, client_secret } = await loadCredentials();
+  // Use account-specific credentials if available
+  const { client_id, client_secret } = await loadCredentials(accountName);
   const payload = JSON.stringify({
     type: 'authorized_user',
     client_id,
@@ -221,8 +257,10 @@ export async function hasAccounts(): Promise<boolean> {
 /**
  * Add a new account via OAuth flow
  * Returns the auth URL that user needs to visit
+ * @param accountName - Name for the account
+ * @param credentialsPath - Optional path to a credentials.json file for this account
  */
-export async function startAddAccount(accountName: string): Promise<{ authUrl: string; port: number }> {
+export async function startAddAccount(accountName: string, credentialsPath?: string): Promise<{ authUrl: string; port: number; credentialsPath?: string }> {
   const config = await loadAccountsConfig();
 
   // Validate account name
@@ -234,7 +272,41 @@ export async function startAddAccount(accountName: string): Promise<{ authUrl: s
     throw new Error(`Account "${accountName}" already exists. Use removeAccount first if you want to re-add it.`);
   }
 
-  const { client_id, client_secret } = await loadCredentials();
+  // If credentials path provided, verify it exists
+  if (credentialsPath && !await fileExists(credentialsPath)) {
+    throw new Error(`Credentials file not found at ${credentialsPath}`);
+  }
+
+  // Temporarily store the credentials path for this account so loadCredentials can find it
+  // We'll do this by checking the credentials path directly or using account-name based lookup
+  let client_id: string, client_secret: string;
+
+  if (credentialsPath) {
+    // Load from the specified path
+    const content = await fs.readFile(credentialsPath, 'utf8');
+    const keys = JSON.parse(content);
+    const key = keys.installed || keys.web;
+    if (!key) throw new Error(`Could not find client secrets in ${credentialsPath}.`);
+    client_id = key.client_id;
+    client_secret = key.client_secret;
+  } else {
+    // Check for account-specific credentials in the credentials directory
+    const accountCredPath = path.join(CREDENTIALS_DIR, `${accountName}.json`);
+    if (await fileExists(accountCredPath)) {
+      const content = await fs.readFile(accountCredPath, 'utf8');
+      const keys = JSON.parse(content);
+      const key = keys.installed || keys.web;
+      if (!key) throw new Error(`Could not find client secrets in ${accountCredPath}.`);
+      client_id = key.client_id;
+      client_secret = key.client_secret;
+      credentialsPath = accountCredPath;
+    } else {
+      // Fall back to global credentials
+      const creds = await loadCredentials();
+      client_id = creds.client_id;
+      client_secret = creds.client_secret;
+    }
+  }
 
   // Find an available port
   const port = 3000 + Math.floor(Math.random() * 1000);
@@ -248,18 +320,50 @@ export async function startAddAccount(accountName: string): Promise<{ authUrl: s
     prompt: 'consent' // Force consent to get refresh token
   });
 
-  return { authUrl, port };
+  return { authUrl, port, credentialsPath };
 }
 
 /**
  * Complete the OAuth flow by listening for the callback
+ * @param accountName - Name for the account
+ * @param port - Port number for the OAuth callback server
+ * @param credentialsPath - Optional path to a credentials.json file for this account
+ * @param onAuthUrl - Optional callback to receive the auth URL
  */
 export async function completeAddAccount(
   accountName: string,
   port: number,
+  credentialsPath?: string,
   onAuthUrl?: (url: string) => void
 ): Promise<AccountConfig> {
-  const { client_id, client_secret } = await loadCredentials();
+  // Load credentials for this account (using per-account if available)
+  let client_id: string, client_secret: string;
+
+  if (credentialsPath) {
+    const content = await fs.readFile(credentialsPath, 'utf8');
+    const keys = JSON.parse(content);
+    const key = keys.installed || keys.web;
+    if (!key) throw new Error(`Could not find client secrets in ${credentialsPath}.`);
+    client_id = key.client_id;
+    client_secret = key.client_secret;
+  } else {
+    // Check for account-specific credentials
+    const accountCredPath = path.join(CREDENTIALS_DIR, `${accountName}.json`);
+    if (await fileExists(accountCredPath)) {
+      const content = await fs.readFile(accountCredPath, 'utf8');
+      const keys = JSON.parse(content);
+      const key = keys.installed || keys.web;
+      if (!key) throw new Error(`Could not find client secrets in ${accountCredPath}.`);
+      client_id = key.client_id;
+      client_secret = key.client_secret;
+      credentialsPath = accountCredPath;
+    } else {
+      const creds = await loadCredentials();
+      client_id = creds.client_id;
+      client_secret = creds.client_secret;
+    }
+  }
+
   const redirectUri = `http://localhost:${port}`;
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
@@ -301,12 +405,13 @@ export async function completeAddAccount(
           // Save token
           const tokenPath = await saveTokenForAccount(accountName, oAuth2Client);
 
-          // Update config
+          // Update config - include credentialsPath if it was specified
           const config = await loadAccountsConfig();
           const accountConfig: AccountConfig = {
             name: accountName,
             email,
             tokenPath,
+            ...(credentialsPath && { credentialsPath }),
             addedAt: new Date().toISOString()
           };
           config.accounts[accountName] = accountConfig;

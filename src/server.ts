@@ -2498,15 +2498,18 @@ const pendingOAuthSessions: Map<string, { port: number; authUrl: string; resolve
 
 server.addTool({
   name: 'addAccount',
-  description: 'Starts the OAuth flow to add a new Google account. Returns an authorization URL that must be opened in a browser. After authorizing, call completeAddAccount to finish the setup. The account name must be unique and contain only letters, numbers, underscores, and hyphens.',
+  description: 'Starts the OAuth flow to add a new Google account. Returns an authorization URL that must be opened in a browser. After authorizing, the account will be added automatically. The account name must be unique and contain only letters, numbers, underscores, and hyphens. Optionally, you can specify a custom credentials file to use a different OAuth app for this account.',
   parameters: z.object({
     name: z.string()
       .min(1)
       .regex(/^[a-zA-Z0-9_-]+$/, 'Account name must contain only letters, numbers, underscores, and hyphens')
-      .describe('A unique name for this account (e.g., "work", "personal", "client-abc")')
+      .describe('A unique name for this account (e.g., "work", "personal", "client-abc")'),
+    credentialsPath: z.string()
+      .optional()
+      .describe('Optional: Path to a custom credentials.json file for this account. Use this to authenticate with a different OAuth app. If not specified, looks for ~/.google-mcp/credentials/{name}.json, then falls back to the global credentials.')
   }),
   execute: async (args, { log }) => {
-    log.info(`Starting OAuth flow for account: ${args.name}`);
+    log.info(`Starting OAuth flow for account: ${args.name}${args.credentialsPath ? ` with custom credentials: ${args.credentialsPath}` : ''}`);
     await ensureAccountsInitialized();
 
     try {
@@ -2518,8 +2521,8 @@ server.addTool({
 
       const port = 3000 + Math.floor(Math.random() * 1000);
 
-      // Start the OAuth flow in the background
-      const oauthPromise = completeAddAccount(args.name, port, (authUrl) => {
+      // Start the OAuth flow in the background, passing the optional credentials path
+      const oauthPromise = completeAddAccount(args.name, port, args.credentialsPath, (authUrl) => {
         // Store the session info
         pendingOAuthSessions.set(args.name, {
           port,
@@ -2546,13 +2549,19 @@ server.addTool({
         log.error(`OAuth failed for account: ${args.name}: ${err.message}`);
       });
 
-      return `ACTION REQUIRED: Open this URL to authorize account "${args.name}":
+      let response = `ACTION REQUIRED: Open this URL to authorize account "${args.name}":
 
 ${session.authUrl}
 
 ^^^^ COPY AND OPEN THE URL ABOVE IN YOUR BROWSER ^^^^
 
 After authorizing, the account will be added automatically. Server listening on port ${port}.`;
+
+      if (args.credentialsPath) {
+        response += `\n\nUsing custom credentials: ${args.credentialsPath}`;
+      }
+
+      return response;
     } catch (error: any) {
       log.error(`Error starting OAuth: ${error.message || error}`);
       if (error instanceof UserError) throw error;

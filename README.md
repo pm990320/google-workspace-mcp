@@ -240,6 +240,45 @@ If you get an error like **"Access blocked: App can only be used within its orga
 
 **Note:** Apps in "Testing" mode are limited to 100 test users total. If you need more, you'll need to submit your app for verification.
 
+### Step 5c: Per-Account OAuth Apps (Advanced)
+
+For advanced use cases, you can use different OAuth apps (different Google Cloud projects) for different accounts. This is useful when:
+- Different accounts belong to different organizations with separate Google Cloud projects
+- You want to isolate OAuth permissions between accounts
+- Different accounts need different OAuth scopes
+
+**Option 1: Name-based credentials (recommended)**
+
+Place credentials files in `~/.google-mcp/credentials/` using the account name:
+
+```
+~/.google-mcp/
+├── credentials.json              # Global default
+├── credentials/
+│   ├── work.json                 # Used for account "work"
+│   └── personal.json             # Used for account "personal"
+└── tokens/
+    ├── work.json
+    └── personal.json
+```
+
+When you call `addAccount` with name "work", it will automatically look for `~/.google-mcp/credentials/work.json` first.
+
+**Option 2: Explicit credentials path**
+
+Specify a custom credentials file when adding an account:
+
+```
+"Add account 'client-abc' with credentialsPath '/path/to/client-abc-credentials.json'"
+```
+
+The credentials path will be stored in the account config and used for all subsequent API calls.
+
+**Lookup Priority:**
+1. Explicit `credentialsPath` stored in account config
+2. `~/.google-mcp/credentials/{accountName}.json`
+3. Global `~/.google-mcp/credentials.json`
+
 ### Alternative: Service Account with Domain-Wide Delegation (Enterprise)
 
 For Google Workspace organizations that need to access documents across the domain without individual user OAuth flows, you can use a service account with domain-wide delegation.

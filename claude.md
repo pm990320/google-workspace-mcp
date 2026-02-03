@@ -9,10 +9,24 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Tool | Description |
 |------|-------------|
 | `listAccounts` | List all connected Google accounts |
-| `addAccount` | Add a new Google account (returns OAuth URL) |
+| `addAccount` | Add a new Google account (returns OAuth URL). Optional `credentialsPath` for per-account OAuth apps. |
 | `removeAccount` | Remove a connected account |
 
-Config stored in `~/.google-mcp/` (accounts.json, tokens/, credentials.json)
+**Config directory:** `~/.google-mcp/`
+```
+~/.google-mcp/
+├── accounts.json                 # Account registry
+├── credentials.json              # Global OAuth credentials (fallback)
+├── credentials/
+│   └── {accountName}.json        # Per-account OAuth credentials (optional)
+└── tokens/
+    └── {accountName}.json        # OAuth tokens per account
+```
+
+**Credentials lookup priority:**
+1. Explicit `credentialsPath` in account config
+2. `~/.google-mcp/credentials/{accountName}.json`
+3. `~/.google-mcp/credentials.json` (global)
 
 ## Tool Categories
 
