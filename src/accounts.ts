@@ -607,3 +607,32 @@ export function getConfigDir(): string {
 export function getCredentialsPath(): string {
   return CREDENTIALS_PATH;
 }
+
+/**
+ * Get the email address associated with an account
+ * Returns the stored email if available, otherwise returns the account name as fallback
+ */
+export async function getAccountEmail(accountName: string): Promise<string> {
+  const config = await loadAccountsConfig();
+  // eslint-disable-next-line security/detect-object-injection -- accountName is validated by caller
+  const account = config.accounts[accountName];
+  if (account?.email) {
+    return account.email;
+  }
+  // Fallback: try to get email from token info
+  try {
+    const tokenInfo = await getTokenInfo(accountName);
+    if (tokenInfo.email) {
+      // Cache the email in the account config for future use
+      if (account) {
+        account.email = tokenInfo.email;
+        await saveAccountsConfig(config);
+      }
+      return tokenInfo.email;
+    }
+  } catch {
+    // Ignore errors, use fallback
+  }
+  // Last resort fallback - return account name (won't work for authuser but better than nothing)
+  return accountName;
+}
