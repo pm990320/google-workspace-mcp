@@ -1,5 +1,5 @@
 // src/googleSheetsApiHelpers.ts
-import { google, sheets_v4 } from 'googleapis';
+import { sheets_v4 } from 'googleapis';
 import { UserError } from 'fastmcp';
 
 type Sheets = sheets_v4.Sheets; // Alias for convenience
@@ -34,7 +34,9 @@ export function a1ToRowCol(a1: string): { row: number; col: number } {
  */
 export function rowColToA1(row: number, col: number): string {
   if (row < 0 || col < 0) {
-    throw new UserError(`Row and column indices must be non-negative. Got row: ${row}, col: ${col}`);
+    throw new UserError(
+      `Row and column indices must be non-negative. Got row: ${row}, col: ${col}`
+    );
   }
 
   let colStr = '';
@@ -86,7 +88,9 @@ export async function readRange(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`
+      );
     }
     throw new UserError(`Failed to read range: ${error.message || 'Unknown error'}`);
   }
@@ -117,7 +121,9 @@ export async function writeRange(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
     }
     throw new UserError(`Failed to write range: ${error.message || 'Unknown error'}`);
   }
@@ -149,7 +155,9 @@ export async function appendValues(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
     }
     throw new UserError(`Failed to append values: ${error.message || 'Unknown error'}`);
   }
@@ -174,7 +182,9 @@ export async function clearRange(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
     }
     throw new UserError(`Failed to clear range: ${error.message || 'Unknown error'}`);
   }
@@ -198,7 +208,9 @@ export async function getSpreadsheetMetadata(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have read access.`
+      );
     }
     throw new UserError(`Failed to get spreadsheet metadata: ${error.message || 'Unknown error'}`);
   }
@@ -233,7 +245,9 @@ export async function addSheet(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
     }
     throw new UserError(`Failed to add sheet: ${error.message || 'Unknown error'}`);
   }
@@ -287,7 +301,7 @@ export async function formatCells(
 
     if (sheetName) {
       // Find the sheet by name
-      const sheet = metadata.sheets?.find(s => s.properties?.title === sheetName);
+      const sheet = metadata.sheets?.find((s) => s.properties?.title === sheetName);
       if (!sheet || !sheet.properties?.sheetId) {
         throw new UserError(`Sheet "${sheetName}" not found in spreadsheet.`);
       }
@@ -384,7 +398,8 @@ export async function formatCells(
               cell: {
                 userEnteredFormat,
               },
-              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+              fields:
+                'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
             },
           },
         ],
@@ -397,7 +412,9 @@ export async function formatCells(
       throw new UserError(`Spreadsheet not found (ID: ${spreadsheetId}). Check the ID.`);
     }
     if (error.code === 403) {
-      throw new UserError(`Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`);
+      throw new UserError(
+        `Permission denied for spreadsheet (ID: ${spreadsheetId}). Ensure you have write access.`
+      );
     }
     if (error instanceof UserError) throw error;
     throw new UserError(`Failed to format cells: ${error.message || 'Unknown error'}`);
@@ -424,4 +441,3 @@ export function hexToRgb(hex: string): { red: number; green: number; blue: numbe
     blue: (bigint & 255) / 255,
   };
 }
-

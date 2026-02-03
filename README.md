@@ -1,14 +1,17 @@
-# Ultimate Google Docs, Sheets & Drive MCP Server
+# Google Workspace MCP Server
 
-![Demo Animation](assets/google.docs.mcp.1.gif)
-
-Connect Claude Desktop (or other MCP clients) to your Google Docs, Google Sheets, and Google Drive!
+Connect Claude Desktop (or other MCP clients) to your entire Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms!
 
 > 🔥 **Check out [15 powerful tasks](SAMPLE_TASKS.md) you can accomplish with this enhanced server!**
-> 📁 **NEW:** Complete Google Drive file management capabilities!
-> 📊 **NEW:** Full Google Sheets support for reading, writing, and managing spreadsheets!
+> 📧 **NEW:** Full Gmail support (send, read, search, labels, drafts)
+> 📅 **NEW:** Google Calendar integration (events, calendars, CRUD)
+> 📽️ **NEW:** Google Slides support (presentations, slides, text)
+> 📝 **NEW:** Google Forms support (create forms, questions, responses)
+> 👥 **NEW:** Multi-account support (connect multiple Google accounts)
 
-This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide tools for reading, writing, formatting, structuring Google Documents and Spreadsheets, and managing your entire Google Drive. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, spreadsheets, and files programmatically with advanced capabilities.
+This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **65+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
+
+**Upgrading from [a-bonus/google-docs-mcp](https://github.com/a-bonus/google-docs-mcp)?** See [UPGRADE.md](UPGRADE.md) for migration instructions.
 
 **Features:**
 
@@ -61,6 +64,41 @@ This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp
 - **File Operations:** Move (`moveFile`), copy (`copyFile`), rename (`renameFile`), delete (`deleteFile`)
 - **Document Creation:** Create new docs (`createDocument`) or from templates (`createFromTemplate`)
 
+### 🆕 Gmail
+
+- **List Messages:** View inbox messages with `listGmailMessages` (with optional query filters)
+- **Read Messages:** Get full message content with `readGmailMessage`
+- **Send Email:** Compose and send emails with `sendGmailMessage` (supports HTML, CC, BCC)
+- **Search:** Find emails with `searchGmail` using Gmail query syntax
+- **Labels:** List labels with `listGmailLabels`, modify with `modifyGmailLabels`
+- **Drafts:** Create email drafts with `createGmailDraft`
+- **Delete:** Remove messages with `deleteGmailMessage`
+
+### 🆕 Google Calendar
+
+- **List Calendars:** View all calendars with `listCalendars`
+- **List Events:** Get events from a calendar with `listCalendarEvents` (with date range filters)
+- **Get Event:** Get detailed event info with `getCalendarEvent`
+- **Create Events:** Create new events with `createCalendarEvent` (supports attendees, reminders)
+- **Update Events:** Modify existing events with `updateCalendarEvent`
+- **Delete Events:** Remove events with `deleteCalendarEvent`
+
+### 🆕 Google Slides
+
+- **List Presentations:** Find presentations with `listPresentations`
+- **Read Presentation:** Get full presentation content with `readPresentation`
+- **Create Presentation:** Create new presentations with `createPresentation`
+- **Add Slides:** Add new slides with `addSlide` (supports layout selection)
+- **Add Text:** Insert text into slides with `addTextToSlide`
+
+### 🆕 Google Forms
+
+- **List Forms:** Find forms with `listForms`
+- **Read Form:** Get form structure and questions with `readForm`
+- **Get Responses:** Retrieve form responses with `getFormResponses`
+- **Create Form:** Create new forms with `createForm`
+- **Add Questions:** Add questions with `addFormQuestion` (supports multiple types)
+
 ### Multi-Account Support
 
 - **Multiple Google Accounts:** Connect multiple Google accounts (personal, work, etc.) to a single server instance
@@ -95,15 +133,78 @@ Follow these steps carefully to get your own instance of the server running.
 
 This server needs permission to talk to Google APIs on your behalf. You'll create special "keys" (credentials) that only your server will use.
 
+You can set this up using either the **Web UI** (easier for beginners) or the **CLI** (faster for experienced users).
+
+<details>
+<summary><strong>Option A: CLI Setup (using gcloud)</strong></summary>
+
+If you have the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed, run these commands:
+
+```bash
+# Set your project name
+PROJECT_ID="my-mcp-workspace"
+
+# Create a new project (or skip if using existing)
+gcloud projects create $PROJECT_ID --name="MCP Workspace Server"
+gcloud config set project $PROJECT_ID
+
+# Enable billing (required for APIs) - you'll need to do this in the console
+echo "Enable billing at: https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
+
+# Enable all required APIs
+gcloud services enable \
+  docs.googleapis.com \
+  sheets.googleapis.com \
+  drive.googleapis.com \
+  gmail.googleapis.com \
+  calendar-json.googleapis.com \
+  slides.googleapis.com \
+  forms.googleapis.com
+
+# Create OAuth consent screen (external, for testing)
+gcloud alpha iap oauth-brands create \
+  --application_title="MCP Workspace Server" \
+  --support_email="$(gcloud config get-value account)"
+
+# Create OAuth 2.0 credentials (Desktop app)
+gcloud alpha iap oauth-clients create \
+  "projects/$PROJECT_ID/brands/$(gcloud alpha iap oauth-brands list --format='value(name)' | head -1 | xargs basename)" \
+  --display_name="MCP Desktop Client"
+
+# Download the credentials
+# Note: You may need to download from the console for Desktop app type:
+echo "Download credentials from: https://console.cloud.google.com/apis/credentials?project=$PROJECT_ID"
+echo "Click on your OAuth client, then 'Download JSON', rename to credentials.json"
+
+# Move to config directory
+mkdir -p ~/.google-mcp
+# mv ~/Downloads/client_secret_*.json ~/.google-mcp/credentials.json
+
+# Add yourself as a test user (do this in console under OAuth consent screen > Test users)
+echo "Add test users at: https://console.cloud.google.com/apis/credentials/consent?project=$PROJECT_ID"
+```
+
+**Note:** Some gcloud commands for OAuth are in alpha/beta. If they don't work, use the Web UI method below.
+
+</details>
+
+<details>
+<summary><strong>Option B: Web UI Setup (step-by-step)</strong></summary>
+
 1.  **Go to Google Cloud Console:** Open your web browser and go to the [Google Cloud Console](https://console.cloud.google.com/). You might need to log in with your Google Account.
 2.  **Create or Select a Project:**
     - If you don't have a project, click the project dropdown near the top and select "NEW PROJECT". Give it a name (e.g., "My MCP Docs Server") and click "CREATE".
     - If you have existing projects, you can select one or create a new one.
 3.  **Enable APIs:** You need to turn on the specific Google services this server uses.
     - In the search bar at the top, type "APIs & Services" and select "Library".
-    - Search for "**Google Docs API**" and click on it. Then click the "**ENABLE**" button.
-    - Search for "**Google Sheets API**" and click on it. Then click the "**ENABLE**" button.
-    - Search for "**Google Drive API**" and click on it. Then click the "**ENABLE**" button (this is often needed for finding files or permissions).
+    - Search for and enable each of these APIs:
+      - **Google Docs API** - for document operations
+      - **Google Sheets API** - for spreadsheet operations
+      - **Google Drive API** - for file management
+      - **Gmail API** - for email operations
+      - **Google Calendar API** - for calendar operations
+      - **Google Slides API** - for presentation operations
+      - **Google Forms API** - for forms operations
 4.  **Configure OAuth Consent Screen:** This screen tells users (usually just you) what your app wants permission for.
     - On the left menu, click "APIs & Services" -> "**OAuth consent screen**" (or search for "**Google Auth Platform**" and go to "Audience").
     - Choose User Type: Select "**External**" and click "CREATE".
@@ -114,9 +215,14 @@ This server needs permission to talk to Google APIs on your behalf. You'll creat
       - **Developer contact information:** Enter your email address.
     - Click "**SAVE AND CONTINUE**".
     - **Scopes:** Click "**ADD OR REMOVE SCOPES**". Search for and add the following scopes:
-      - `https://www.googleapis.com/auth/documents` (Allows reading/writing docs)
-      - `https://www.googleapis.com/auth/spreadsheets` (Allows reading/writing spreadsheets)
-      - `https://www.googleapis.com/auth/drive.file` (Allows access to specific files opened/created by the app)
+      - `https://www.googleapis.com/auth/documents` (Google Docs)
+      - `https://www.googleapis.com/auth/spreadsheets` (Google Sheets)
+      - `https://www.googleapis.com/auth/drive` (Google Drive - full access)
+      - `https://www.googleapis.com/auth/gmail.modify` (Gmail)
+      - `https://www.googleapis.com/auth/calendar` (Google Calendar)
+      - `https://www.googleapis.com/auth/presentations` (Google Slides)
+      - `https://www.googleapis.com/auth/forms.body` (Google Forms)
+      - `https://www.googleapis.com/auth/forms.responses.readonly` (Form responses)
       - Click "**UPDATE**".
     - Click "**SAVE AND CONTINUE**".
     - **Test Users:** Click "**ADD USERS**". Add **all** the Google email addresses you plan to connect (including accounts from different domains). Click "**ADD**". This allows those users to authorize while the app is in "testing" mode.
@@ -133,17 +239,23 @@ This server needs permission to talk to Google APIs on your behalf. You'll creat
     - **IMPORTANT:** Rename the downloaded file to exactly `credentials.json`.
 7.  ⚠️ **SECURITY WARNING:** Treat this `credentials.json` file like a password! Do not share it publicly, and **never commit it to GitHub.** Anyone with this file could potentially pretend to be _your application_ (though they'd still need user consent to access data).
 
+</details>
+
 ### Step 2: Get the Server Code
 
 1.  **Clone the Repository:** Open your terminal/command prompt and run:
     ```bash
-    git clone https://github.com/a-bonus/google-docs-mcp.git mcp-googledocs-server
+    git clone https://github.com/YOUR_USERNAME/google-workspace-mcp.git
     ```
 2.  **Navigate into Directory:**
     ```bash
-    cd mcp-googledocs-server
+    cd google-workspace-mcp
     ```
-3.  **Place Credentials:** Move or copy the `credentials.json` file you downloaded and renamed (from Step 1.6) directly into this `mcp-googledocs-server` folder.
+3.  **Place Credentials:** Move or copy the `credentials.json` file you downloaded and renamed (from Step 1.6) to the config directory:
+    ```bash
+    mkdir -p ~/.google-mcp
+    mv credentials.json ~/.google-mcp/credentials.json
+    ```
 
 ### Step 3: Install Dependencies
 

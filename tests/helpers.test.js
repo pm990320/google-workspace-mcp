@@ -42,10 +42,10 @@ describe('Text Range Finding', () => {
       // Verify the docs.documents.get was called with the right parameters
       assert.strictEqual(mockDocs.documents.get.mock.calls.length, 1);
       assert.deepStrictEqual(
-        mockDocs.documents.get.mock.calls[0].arguments[0], 
+        mockDocs.documents.get.mock.calls[0].arguments[0],
         {
           documentId: 'doc123',
-          fields: 'body(content(paragraph(elements(startIndex,endIndex,textRun(content)))))'
+          fields: 'body(content(paragraph(elements(startIndex,endIndex,textRun(content))),table,sectionBreak,tableOfContents,startIndex,endIndex))'
         }
       );
     });

@@ -1,6 +1,6 @@
 # VS Code Integration Guide
 
-This guide shows you how to integrate the Ultimate Google Docs & Drive MCP Server with VS Code using the MCP extension.
+This guide shows you how to integrate the Google Workspace MCP Server with VS Code using the MCP extension.
 
 ## Prerequisites
 
@@ -28,7 +28,7 @@ Before setting up VS Code integration, make sure you have:
 
 ```json
 {
-  "google-docs-drive": {
+  "google-workspace": {
     "command": "node",
     "args": ["${workspaceFolder}/dist/server.js"],
     "env": {

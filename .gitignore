@@ -1,13 +1,40 @@
 # Node dependencies
 node_modules/
+
+# Build output
 dist/
 
-# Credentials / Tokens
+# Credentials / Tokens (NEVER commit these)
 credentials.json
 token.json
+*.json.backup
+
+# Config directory (contains sensitive tokens)
+.google-mcp/
 
 # Log files
 *.log
 
-# Environment variables (if you use a .env file later)
-.env* 
+# Environment variables
+.env*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cjs
+
+# Repomix output
+repomix-output.txt.xml
+.repomix/

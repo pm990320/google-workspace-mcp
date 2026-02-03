@@ -1,12 +1,20 @@
 // src/accounts.ts
-// Multi-account management for Google Docs MCP Server
+// Multi-account management for Google Workspace MCP Server
 
-import { google, docs_v1, drive_v3, sheets_v4 } from 'googleapis';
+import {
+  google,
+  docs_v1,
+  drive_v3,
+  sheets_v4,
+  gmail_v1,
+  calendar_v3,
+  slides_v1,
+  forms_v1,
+} from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as http from 'http';
-import { fileURLToPath } from 'url';
 
 // --- Configuration paths ---
 const CONFIG_DIR = path.join(process.env.HOME || '~', '.google-mcp');
@@ -18,7 +26,12 @@ const TOKENS_DIR = path.join(CONFIG_DIR, 'tokens');
 const SCOPES = [
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/drive',
-  'https://www.googleapis.com/auth/spreadsheets'
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/presentations',
+  'https://www.googleapis.com/auth/forms.body',
+  'https://www.googleapis.com/auth/forms.responses.readonly',
 ];
 
 // --- Types ---
@@ -26,7 +39,7 @@ export interface AccountConfig {
   name: string;
   email?: string;
   tokenPath: string;
-  credentialsPath?: string;  // Optional per-account credentials file
+  credentialsPath?: string; // Optional per-account credentials file
   addedAt: string;
 }
 
@@ -40,6 +53,10 @@ export interface AccountClients {
   docs: docs_v1.Docs;
   drive: drive_v3.Drive;
   sheets: sheets_v4.Sheets;
+  gmail: gmail_v1.Gmail;
+  calendar: calendar_v3.Calendar;
+  slides: slides_v1.Slides;
+  forms: forms_v1.Forms;
 }
 
 // --- Account Registry (in-memory cache) ---
@@ -65,7 +82,7 @@ async function loadAccountsConfig(): Promise<AccountsConfig> {
       // Create default config
       accountsConfig = {
         accounts: {},
-        credentialsPath: CREDENTIALS_PATH
+        credentialsPath: CREDENTIALS_PATH,
       };
       await saveAccountsConfig();
       return accountsConfig;
@@ -88,7 +105,9 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function loadCredentials(accountName?: string): Promise<{ client_id: string; client_secret: string; redirect_uris: string[] }> {
+async function loadCredentials(
+  accountName?: string
+): Promise<{ client_id: string; client_secret: string; redirect_uris: string[] }> {
   const config = await loadAccountsConfig();
   let credPath: string;
 
@@ -97,7 +116,7 @@ async function loadCredentials(accountName?: string): Promise<{ client_id: strin
     const account = config.accounts[accountName];
 
     // Check for explicit per-account credentials path in config
-    if (account?.credentialsPath && await fileExists(account.credentialsPath)) {
+    if (account?.credentialsPath && (await fileExists(account.credentialsPath))) {
       credPath = account.credentialsPath;
     }
     // Check for credentials in the credentials directory by account name
@@ -123,11 +142,13 @@ async function loadCredentials(accountName?: string): Promise<{ client_id: strin
     return {
       client_id: key.client_id,
       client_secret: key.client_secret,
-      redirect_uris: key.redirect_uris || ['http://localhost:3000']
+      redirect_uris: key.redirect_uris || ['http://localhost:3000'],
     };
   } catch (err: any) {
     if (err.code === 'ENOENT') {
-      throw new Error(`Credentials file not found at ${credPath}. Please copy your OAuth credentials.json to this location.`);
+      throw new Error(
+        `Credentials file not found at ${credPath}. Please copy your OAuth credentials.json to this location.`
+      );
     }
     throw err;
   }
@@ -150,7 +171,7 @@ async function loadTokenForAccount(accountName: string): Promise<OAuth2Client | 
     const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     client.setCredentials(credentials);
     return client;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -190,11 +211,17 @@ export async function initializeAccounts(): Promise<void> {
           authClient,
           docs: google.docs({ version: 'v1', auth: authClient }),
           drive: google.drive({ version: 'v3', auth: authClient }),
-          sheets: google.sheets({ version: 'v4', auth: authClient })
+          sheets: google.sheets({ version: 'v4', auth: authClient }),
+          gmail: google.gmail({ version: 'v1', auth: authClient }),
+          calendar: google.calendar({ version: 'v3', auth: authClient }),
+          slides: google.slides({ version: 'v1', auth: authClient }),
+          forms: google.forms({ version: 'v1', auth: authClient }),
         });
         console.error(`Loaded account: ${name}${account.email ? ` (${account.email})` : ''}`);
       } else {
-        console.error(`Warning: Could not load token for account "${name}" - may need re-authentication`);
+        console.error(
+          `Warning: Could not load token for account "${name}" - may need re-authentication`
+        );
       }
     } catch (err) {
       console.error(`Warning: Failed to load account "${name}": ${err}`);
@@ -217,21 +244,31 @@ export async function getAccountClients(accountName: string): Promise<AccountCli
   if (!config.accounts[accountName]) {
     const available = Object.keys(config.accounts);
     if (available.length === 0) {
-      throw new Error(`Account "${accountName}" not found. No accounts configured. Use the addAccount tool to add an account.`);
+      throw new Error(
+        `Account "${accountName}" not found. No accounts configured. Use the addAccount tool to add an account.`
+      );
     }
-    throw new Error(`Account "${accountName}" not found. Available accounts: ${available.join(', ')}`);
+    throw new Error(
+      `Account "${accountName}" not found. Available accounts: ${available.join(', ')}`
+    );
   }
 
   const authClient = await loadTokenForAccount(accountName);
   if (!authClient) {
-    throw new Error(`Account "${accountName}" exists but token is invalid or missing. Use addAccount to re-authenticate.`);
+    throw new Error(
+      `Account "${accountName}" exists but token is invalid or missing. Use addAccount to re-authenticate.`
+    );
   }
 
   const clients: AccountClients = {
     authClient,
     docs: google.docs({ version: 'v1', auth: authClient }),
     drive: google.drive({ version: 'v3', auth: authClient }),
-    sheets: google.sheets({ version: 'v4', auth: authClient })
+    sheets: google.sheets({ version: 'v4', auth: authClient }),
+    gmail: google.gmail({ version: 'v1', auth: authClient }),
+    calendar: google.calendar({ version: 'v3', auth: authClient }),
+    slides: google.slides({ version: 'v1', auth: authClient }),
+    forms: google.forms({ version: 'v1', auth: authClient }),
   };
 
   accountClients.set(accountName, clients);
@@ -260,7 +297,10 @@ export async function hasAccounts(): Promise<boolean> {
  * @param accountName - Name for the account
  * @param credentialsPath - Optional path to a credentials.json file for this account
  */
-export async function startAddAccount(accountName: string, credentialsPath?: string): Promise<{ authUrl: string; port: number; credentialsPath?: string }> {
+export async function startAddAccount(
+  accountName: string,
+  credentialsPath?: string
+): Promise<{ authUrl: string; port: number; credentialsPath?: string }> {
   const config = await loadAccountsConfig();
 
   // Validate account name
@@ -269,11 +309,13 @@ export async function startAddAccount(accountName: string, credentialsPath?: str
   }
 
   if (config.accounts[accountName]) {
-    throw new Error(`Account "${accountName}" already exists. Use removeAccount first if you want to re-add it.`);
+    throw new Error(
+      `Account "${accountName}" already exists. Use removeAccount first if you want to re-add it.`
+    );
   }
 
   // If credentials path provided, verify it exists
-  if (credentialsPath && !await fileExists(credentialsPath)) {
+  if (credentialsPath && !(await fileExists(credentialsPath))) {
     throw new Error(`Credentials file not found at ${credentialsPath}`);
   }
 
@@ -317,7 +359,7 @@ export async function startAddAccount(accountName: string, credentialsPath?: str
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES.join(' '),
-    prompt: 'consent' // Force consent to get refresh token
+    prompt: 'consent', // Force consent to get refresh token
   });
 
   return { authUrl, port, credentialsPath };
@@ -370,7 +412,7 @@ export async function completeAddAccount(
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES.join(' '),
-    prompt: 'consent'
+    prompt: 'consent',
   });
 
   if (onAuthUrl) {
@@ -385,7 +427,9 @@ export async function completeAddAccount(
 
         if (code) {
           res.writeHead(200, { 'Content-Type': 'text/html' });
-          res.end(`<html><body><h1>Authentication successful for "${accountName}"!</h1><p>You can close this window.</p></body></html>`);
+          res.end(
+            `<html><body><h1>Authentication successful for "${accountName}"!</h1><p>You can close this window.</p></body></html>`
+          );
 
           server.close();
 
@@ -398,7 +442,7 @@ export async function completeAddAccount(
           try {
             const userInfo = await oauth2.userinfo.get();
             email = userInfo.data.email || undefined;
-          } catch (e) {
+          } catch {
             // Email fetch failed, continue without it
           }
 
@@ -412,7 +456,7 @@ export async function completeAddAccount(
             email,
             tokenPath,
             ...(credentialsPath && { credentialsPath }),
-            addedAt: new Date().toISOString()
+            addedAt: new Date().toISOString(),
           };
           config.accounts[accountName] = accountConfig;
           await saveAccountsConfig();
@@ -422,14 +466,20 @@ export async function completeAddAccount(
             authClient: oAuth2Client,
             docs: google.docs({ version: 'v1', auth: oAuth2Client }),
             drive: google.drive({ version: 'v3', auth: oAuth2Client }),
-            sheets: google.sheets({ version: 'v4', auth: oAuth2Client })
+            sheets: google.sheets({ version: 'v4', auth: oAuth2Client }),
+            gmail: google.gmail({ version: 'v1', auth: oAuth2Client }),
+            calendar: google.calendar({ version: 'v3', auth: oAuth2Client }),
+            slides: google.slides({ version: 'v1', auth: oAuth2Client }),
+            forms: google.forms({ version: 'v1', auth: oAuth2Client }),
           });
 
           resolve(accountConfig);
         } else {
           const error = url.searchParams.get('error');
           res.writeHead(400, { 'Content-Type': 'text/html' });
-          res.end(`<html><body><h1>Authentication failed</h1><p>${error || 'No code received'}</p></body></html>`);
+          res.end(
+            `<html><body><h1>Authentication failed</h1><p>${error || 'No code received'}</p></body></html>`
+          );
           server.close();
           reject(new Error(error || 'No authorization code received'));
         }
@@ -454,10 +504,13 @@ export async function completeAddAccount(
     });
 
     // Timeout after 5 minutes
-    setTimeout(() => {
-      server.close();
-      reject(new Error('Authentication timed out after 5 minutes'));
-    }, 5 * 60 * 1000);
+    setTimeout(
+      () => {
+        server.close();
+        reject(new Error('Authentication timed out after 5 minutes'));
+      },
+      5 * 60 * 1000
+    );
   });
 }
 
@@ -475,7 +528,7 @@ export async function removeAccount(accountName: string): Promise<void> {
   const tokenPath = config.accounts[accountName].tokenPath;
   try {
     await fs.unlink(tokenPath);
-  } catch (err) {
+  } catch {
     // Ignore if file doesn't exist
   }
 

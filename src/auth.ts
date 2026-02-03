@@ -1,6 +1,6 @@
 // src/auth.ts
 import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import type { OAuth2Client } from 'google-auth-library';
 import { JWT } from 'google-auth-library'; // ADDED: Import for Service Account client
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -20,7 +20,7 @@ const CREDENTIALS_PATH = path.join(projectRootDir, 'credentials.json');
 const SCOPES = [
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/drive', // Full Drive access for listing, searching, and document discovery
-  'https://www.googleapis.com/auth/spreadsheets' // Google Sheets API access
+  'https://www.googleapis.com/auth/spreadsheets', // Google Sheets API access
 ];
 
 // --- NEW FUNCTION: Handles Service Account Authentication ---
@@ -50,10 +50,14 @@ async function authorizeWithServiceAccount(): Promise<JWT> {
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       console.error(`FATAL: Service account key file not found at path: ${serviceAccountPath}`);
-      throw new Error(`Service account key file not found. Please check the path in SERVICE_ACCOUNT_PATH.`);
+      throw new Error(
+        `Service account key file not found. Please check the path in SERVICE_ACCOUNT_PATH.`
+      );
     }
     console.error('FATAL: Error loading or authorizing the service account key:', error.message);
-    throw new Error('Failed to authorize using the service account. Ensure the key file is valid and the path is correct.');
+    throw new Error(
+      'Failed to authorize using the service account. Ensure the key file is valid and the path is correct.'
+    );
   }
 }
 // --- END OF NEW FUNCTION---
@@ -66,7 +70,7 @@ async function loadSavedCredentialsIfExist(): Promise<OAuth2Client | null> {
     const client = new google.auth.OAuth2(client_id, client_secret, redirect_uris?.[0]);
     client.setCredentials(credentials);
     return client;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -75,12 +79,12 @@ async function loadClientSecrets() {
   const content = await fs.readFile(CREDENTIALS_PATH);
   const keys = JSON.parse(content.toString());
   const key = keys.installed || keys.web;
-   if (!key) throw new Error("Could not find client secrets in credentials.json.");
+  if (!key) throw new Error('Could not find client secrets in credentials.json.');
   return {
-      client_id: key.client_id,
-      client_secret: key.client_secret,
-      redirect_uris: key.redirect_uris || ['http://localhost:3000/'], // Default for web clients
-      client_type: keys.web ? 'web' : 'installed'
+    client_id: key.client_id,
+    client_secret: key.client_secret,
+    redirect_uris: key.redirect_uris || ['http://localhost:3000/'], // Default for web clients
+    client_type: keys.web ? 'web' : 'installed',
   };
 }
 
@@ -122,7 +126,9 @@ async function authenticate(): Promise<OAuth2Client> {
 
           if (code) {
             res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end('<html><body><h1>Authentication successful!</h1><p>You can close this window.</p></body></html>');
+            res.end(
+              '<html><body><h1>Authentication successful!</h1><p>You can close this window.</p></body></html>'
+            );
 
             server.close();
 
@@ -131,7 +137,7 @@ async function authenticate(): Promise<OAuth2Client> {
             if (tokens.refresh_token) {
               await saveCredentials(oAuth2Client);
             } else {
-              console.error("Did not receive refresh token. Token might expire.");
+              console.error('Did not receive refresh token. Token might expire.');
             }
             console.error('Authentication successful!');
             resolve(oAuth2Client);
@@ -170,7 +176,7 @@ async function authenticate(): Promise<OAuth2Client> {
       if (tokens.refresh_token) {
         await saveCredentials(oAuth2Client);
       } else {
-        console.error("Did not receive refresh token. Token might expire.");
+        console.error('Did not receive refresh token. Token might expire.');
       }
       console.error('Authentication successful!');
       return oAuth2Client;
