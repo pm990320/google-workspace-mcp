@@ -188,7 +188,8 @@ export function registerGmailTools(options: GmailToolOptions) {
             result += `${i + 1}. ${att.filename} (${att.mimeType}, ${att.size} bytes)\n`;
             result += `   Attachment ID: ${att.attachmentId}\n`;
           });
-          result += '\nUse getGmailAttachment with the message ID and attachment ID to download attachments.\n';
+          result +=
+            '\nUse getGmailAttachment with the message ID and attachment ID to download attachments.\n';
         }
 
         if (link) {
@@ -475,9 +476,7 @@ export function registerGmailTools(options: GmailToolOptions) {
               .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
             base64Data: z
               .string()
-              .describe(
-                'Base64-encoded file content (standard base64, not base64url)'
-              ),
+              .describe('Base64-encoded file content (standard base64, not base64url)'),
           })
         )
         .optional()
@@ -795,9 +794,7 @@ export function registerGmailTools(options: GmailToolOptions) {
               .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
             base64Data: z
               .string()
-              .describe(
-                'Base64-encoded file content (standard base64, not base64url)'
-              ),
+              .describe('Base64-encoded file content (standard base64, not base64url)'),
           })
         )
         .optional()
@@ -936,7 +933,8 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (args.bcc !== undefined) result += '- Bcc\n';
         if (args.subject !== undefined) result += '- Subject\n';
         if (args.body !== undefined) result += '- Body\n';
-        if (args.attachments !== undefined) result += `- Attachments (${args.attachments.length} files)\n`;
+        if (args.attachments !== undefined)
+          result += `- Attachments (${args.attachments.length} files)\n`;
         result += `\nView drafts: ${draftsLink}`;
 
         return result;
@@ -962,9 +960,7 @@ export function registerGmailTools(options: GmailToolOptions) {
       account: z.string().describe('Account name to use'),
       draftId: z.string().describe('The draft ID to add the attachment to'),
       filename: z.string().describe('Name of the file (e.g., "report.pdf")'),
-      mimeType: z
-        .string()
-        .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
+      mimeType: z.string().describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
       base64Data: z
         .string()
         .describe('Base64-encoded file content (standard base64, not base64url)'),
@@ -995,7 +991,12 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (part.mimeType === 'text/plain' && !part.filename && part.body?.data) {
             bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
             bodyMimeType = 'text/plain';
-          } else if (part.mimeType === 'text/html' && !part.filename && part.body?.data && !bodyContent) {
+          } else if (
+            part.mimeType === 'text/html' &&
+            !part.filename &&
+            part.body?.data &&
+            !bodyContent
+          ) {
             bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
             bodyMimeType = 'text/html';
           } else if (part.filename && part.body?.attachmentId) {
@@ -1147,7 +1148,12 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (part.mimeType === 'text/plain' && !part.filename && part.body?.data) {
             bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
             bodyMimeType = 'text/plain';
-          } else if (part.mimeType === 'text/html' && !part.filename && part.body?.data && !bodyContent) {
+          } else if (
+            part.mimeType === 'text/html' &&
+            !part.filename &&
+            part.body?.data &&
+            !bodyContent
+          ) {
             bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
             bodyMimeType = 'text/html';
           } else if (part.filename && part.body?.attachmentId) {
@@ -1183,9 +1189,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         }
 
         // Check if attachment exists
-        const attachmentIndex = existingAttachments.findIndex(
-          (a) => a.filename === args.filename
-        );
+        const attachmentIndex = existingAttachments.findIndex((a) => a.filename === args.filename);
         if (attachmentIndex === -1) {
           const availableFiles = existingAttachments.map((a) => a.filename).join(', ') || 'none';
           throw new Error(
@@ -1628,8 +1632,10 @@ export function registerGmailTools(options: GmailToolOptions) {
         const messages = thread.messages ?? [];
         const accountEmail = await getAccountEmail(args.account);
 
-        const getHeader = (headers: { name?: string | null; value?: string | null }[], name: string) =>
-          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+        const getHeader = (
+          headers: { name?: string | null; value?: string | null }[],
+          name: string
+        ) => headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
 
         const extractBody = (part: MessagePart): string => {
           if (part.body?.data) {
@@ -1841,7 +1847,8 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (criteria.subject) result += `     - Subject: ${criteria.subject}\n`;
           if (criteria.query) result += `     - Query: ${criteria.query}\n`;
           if (criteria.hasAttachment) result += `     - Has attachment: yes\n`;
-          if (criteria.size) result += `     - Size: ${criteria.sizeComparison} ${criteria.size} bytes\n`;
+          if (criteria.size)
+            result += `     - Size: ${criteria.sizeComparison} ${criteria.size} bytes\n`;
 
           result += '   Actions:\n';
           if (action.addLabelIds?.length)
@@ -1884,16 +1891,11 @@ export function registerGmailTools(options: GmailToolOptions) {
         .describe('Filter using Gmail search query syntax (most flexible option)'),
       hasAttachment: z.boolean().optional().describe('Filter emails that have attachments'),
       // Actions (at least one required)
-      addLabelIds: z
-        .array(z.string())
-        .optional()
-        .describe('Label IDs to add to matching emails'),
+      addLabelIds: z.array(z.string()).optional().describe('Label IDs to add to matching emails'),
       removeLabelIds: z
         .array(z.string())
         .optional()
-        .describe(
-          'Label IDs to remove (e.g., ["INBOX"] to archive, ["UNREAD"] to mark as read)'
-        ),
+        .describe('Label IDs to remove (e.g., ["INBOX"] to archive, ["UNREAD"] to mark as read)'),
       forward: z.string().optional().describe('Email address to forward matching emails to'),
     }),
     async execute(args, { log: _log }) {
@@ -1902,7 +1904,9 @@ export function registerGmailTools(options: GmailToolOptions) {
         const hasCriteria =
           args.from || args.to || args.subject || args.query || args.hasAttachment;
         if (!hasCriteria) {
-          throw new Error('At least one filter criteria must be provided (from, to, subject, query, or hasAttachment)');
+          throw new Error(
+            'At least one filter criteria must be provided (from, to, subject, query, or hasAttachment)'
+          );
         }
 
         // Validate that at least one action is provided
@@ -1911,7 +1915,9 @@ export function registerGmailTools(options: GmailToolOptions) {
           (args.removeLabelIds && args.removeLabelIds.length > 0) ||
           args.forward;
         if (!hasAction) {
-          throw new Error('At least one filter action must be provided (addLabelIds, removeLabelIds, or forward)');
+          throw new Error(
+            'At least one filter action must be provided (addLabelIds, removeLabelIds, or forward)'
+          );
         }
 
         const gmail = await getGmailClient(args.account);
