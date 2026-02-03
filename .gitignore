@@ -35,6 +35,10 @@ Thumbs.db
 *.temp
 *.bak
 
+# Test coverage output
+coverage/
+.nyc_output/
+
 # Repomix output
 repomix-output.txt.xml
 .repomix/
