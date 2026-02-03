@@ -144,21 +144,50 @@ First, list available accounts and use one for all subsequent tests. Store the a
 
 ### Tests to perform:
 
+**Basic Message Operations:**
 1. **List all Gmail labels** available in the account
 2. **List recent inbox messages** and note one message ID for testing
 3. **Search Gmail** for messages matching a simple query
 4. **Read a message** in full format using the ID from step 2
-5. **Create a draft email** addressed to a test address with test subject and body
-6. **List all drafts** to verify your draft appears
-7. **Read the draft** to verify its content
-8. **Update the draft** - change the subject line
-9. **Read the draft again** to verify the update
-10. **Add a star label** to the draft's message using `addGmailLabel`
-11. **Remove the star label** from the message using `removeGmailLabel`
-12. **Send the draft** to actually send it (will go to the test address)
-13. **Create another draft** for cleanup testing
-14. **Delete the draft** (permanent deletion)
-15. **Delete the sent message** (moves to trash)
+5. **Mark a message as read** using `markAsRead`
+6. **Mark the message as unread** using `markAsUnread`
+
+**Thread Operations:**
+7. **List Gmail threads** to see conversation groupings
+8. **Read a complete thread** using `readGmailThread` to see all messages in a conversation
+
+**Attachment Operations:**
+9. **Read a message with attachments** (find one using `searchGmail` with `has:attachment`)
+10. **Get attachment metadata** from `readGmailMessage` (note the attachmentId)
+11. **Download an attachment** using `getGmailAttachment`
+
+**Draft Operations:**
+12. **Create a draft email** addressed to a test address with test subject and body
+13. **List all drafts** to verify your draft appears
+14. **Read the draft** to verify its content
+15. **Update the draft** - change the subject line
+16. **Add an attachment to the draft** using `addAttachmentToDraft` (use a small base64 text file)
+17. **Read the draft again** to verify the attachment was added
+18. **Remove the attachment from the draft** using `removeAttachmentFromDraft`
+19. **Add a star label** to the draft's message using `addGmailLabel`
+20. **Remove the star label** from the message using `removeGmailLabel`
+21. **Send the draft** to actually send it (will go to the test address)
+
+**Batch Operations:**
+22. **Search for multiple messages** to get several message IDs
+23. **Batch add labels** to multiple messages using `batchAddGmailLabels`
+24. **Batch remove labels** from multiple messages using `batchRemoveGmailLabels`
+
+**Filter Management:**
+25. **List all Gmail filters** using `listGmailFilters`
+26. **Create a test filter** using `createGmailFilter` (e.g., from:test@example.com → add label)
+27. **List filters again** to verify the filter was created
+28. **Delete the test filter** using `deleteGmailFilter`
+
+**Cleanup:**
+29. **Create another draft** for cleanup testing
+30. **Delete the draft** (permanent deletion)
+31. **Delete the sent message** (moves to trash)
 
 ---
 
@@ -233,11 +262,11 @@ The following tools have known limitations and are excluded:
 | 1 | Docs | 29 |
 | 2 | Drive | 10 |
 | 3 | Sheets | 10 |
-| 4 | Gmail | 15 |
+| 4 | Gmail | 31 |
 | 5 | Calendar | 7 |
 | 6 | Slides | 7 |
 | 7 | Forms | 9 |
-| **Total** | | **~88** |
+| **Total** | | **~104** |
 
 ---
 

@@ -443,7 +443,7 @@ export function registerGmailTools(options: GmailToolOptions) {
   server.addTool({
     name: 'createGmailDraft',
     description:
-      'Create a draft email in Gmail. Supports threading by providing replyToMessageId to create a draft reply.',
+      'Create a draft email in Gmail. Supports threading by providing replyToMessageId to create a draft reply. Supports attachments by providing base64-encoded file data.',
     annotations: {
       title: 'Create Gmail Draft',
       readOnlyHint: false,
@@ -457,6 +457,7 @@ export function registerGmailTools(options: GmailToolOptions) {
       subject: z.string().describe('Email subject'),
       body: z.string().describe('Email body content'),
       cc: z.string().optional().describe('CC recipients'),
+      bcc: z.string().optional().describe('BCC recipients'),
       isHtml: z.boolean().optional().default(false).describe('Whether body is HTML'),
       replyToMessageId: z
         .string()
@@ -464,6 +465,22 @@ export function registerGmailTools(options: GmailToolOptions) {
         .describe(
           'Message ID to reply to (for threading). The draft will appear in the same thread as the original message.'
         ),
+      attachments: z
+        .array(
+          z.object({
+            filename: z.string().describe('Name of the file (e.g., "report.pdf")'),
+            mimeType: z
+              .string()
+              .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
+            base64Data: z
+              .string()
+              .describe(
+                'Base64-encoded file content (standard base64, not base64url)'
+              ),
+          })
+        )
+        .optional()
+        .describe('Array of attachments to include in the draft'),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -503,13 +520,53 @@ export function registerGmailTools(options: GmailToolOptions) {
         }
 
         let emailContent = '';
-        emailContent += `To: ${args.to}\r\n`;
-        if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
-        emailContent += `Subject: ${args.subject}\r\n`;
-        if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
-        if (references) emailContent += `References: ${references}\r\n`;
-        emailContent += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
-        emailContent += `\r\n${args.body}`;
+
+        if (args.attachments && args.attachments.length > 0) {
+          // Build multipart MIME message with attachments
+          const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+          emailContent += `To: ${args.to}\r\n`;
+          if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
+          if (args.bcc) emailContent += `Bcc: ${args.bcc}\r\n`;
+          emailContent += `Subject: ${args.subject}\r\n`;
+          if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
+          if (references) emailContent += `References: ${references}\r\n`;
+          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
+          emailContent += `\r\n`;
+
+          // Body part
+          emailContent += `--${boundary}\r\n`;
+          emailContent += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
+          emailContent += `\r\n`;
+          emailContent += `${args.body}\r\n`;
+
+          // Attachment parts
+          for (const attachment of args.attachments) {
+            emailContent += `--${boundary}\r\n`;
+            emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
+            emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
+            emailContent += `Content-Transfer-Encoding: base64\r\n`;
+            emailContent += `\r\n`;
+            // Split base64 data into 76-character lines per RFC 2045
+            const base64Lines = attachment.base64Data.match(/.{1,76}/g) || [];
+            emailContent += base64Lines.join('\r\n');
+            emailContent += `\r\n`;
+          }
+
+          emailContent += `--${boundary}--\r\n`;
+        } else {
+          // Simple message without attachments
+          emailContent += `To: ${args.to}\r\n`;
+          if (args.cc) emailContent += `Cc: ${args.cc}\r\n`;
+          if (args.bcc) emailContent += `Bcc: ${args.bcc}\r\n`;
+          emailContent += `Subject: ${args.subject}\r\n`;
+          if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
+          if (references) emailContent += `References: ${references}\r\n`;
+          emailContent += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+          emailContent += `\r\n${args.body}`;
+        }
 
         const encodedEmail = Buffer.from(emailContent)
           .toString('base64')
@@ -532,11 +589,16 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         let result = 'Successfully created draft email.\n\n';
         result += `To: ${args.to}\n`;
+        if (args.cc) result += `Cc: ${args.cc}\n`;
+        if (args.bcc) result += `Bcc: ${args.bcc}\n`;
         result += `Subject: ${args.subject}\n`;
         result += `Draft ID: ${response.data.id}\n`;
         result += `Message ID: ${response.data.message?.id}\n`;
         if (threadId) {
           result += `Thread ID: ${threadId} (draft will appear in thread)\n`;
+        }
+        if (args.attachments && args.attachments.length > 0) {
+          result += `Attachments: ${args.attachments.map((a) => a.filename).join(', ')}\n`;
         }
         result += `\nView drafts: ${draftsLink}`;
 
@@ -703,7 +765,7 @@ export function registerGmailTools(options: GmailToolOptions) {
   server.addTool({
     name: 'updateGmailDraft',
     description:
-      'Update an existing Gmail draft. You can update any combination of to, cc, subject, or body. Fields not provided will keep their current values.',
+      'Update an existing Gmail draft. You can update any combination of to, cc, bcc, subject, body, or attachments. Fields not provided will keep their current values (except attachments which replace existing ones if provided).',
     annotations: {
       title: 'Update Gmail Draft',
       readOnlyHint: false,
@@ -716,12 +778,29 @@ export function registerGmailTools(options: GmailToolOptions) {
       draftId: z.string().describe('The draft ID to update'),
       to: z.string().optional().describe('New recipient(s) - if not provided, keeps current'),
       cc: z.string().optional().describe('New CC recipient(s) - if not provided, keeps current'),
+      bcc: z.string().optional().describe('New BCC recipient(s) - if not provided, keeps current'),
       subject: z.string().optional().describe('New subject - if not provided, keeps current'),
       body: z.string().optional().describe('New body content - if not provided, keeps current'),
       isHtml: z
         .boolean()
         .optional()
         .describe('Whether the body is HTML (default: false for plain text)'),
+      attachments: z
+        .array(
+          z.object({
+            filename: z.string().describe('Name of the file (e.g., "report.pdf")'),
+            mimeType: z
+              .string()
+              .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
+            base64Data: z
+              .string()
+              .describe(
+                'Base64-encoded file content (standard base64, not base64url)'
+              ),
+          })
+        )
+        .optional()
+        .describe('Array of attachments (replaces existing attachments if provided)'),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -772,17 +851,56 @@ export function registerGmailTools(options: GmailToolOptions) {
         // Merge with updates (use new values if provided, otherwise keep current)
         const newTo = args.to ?? getCurrentHeader('To');
         const newCc = args.cc ?? getCurrentHeader('Cc');
+        const newBcc = args.bcc ?? getCurrentHeader('Bcc');
         const newSubject = args.subject ?? getCurrentHeader('Subject');
         const newBody = args.body ?? currentBody;
         const isHtml = args.isHtml ?? false;
 
         // Build the updated email
         let emailContent = '';
-        emailContent += `To: ${newTo}\r\n`;
-        if (newCc) emailContent += `Cc: ${newCc}\r\n`;
-        emailContent += `Subject: ${newSubject}\r\n`;
-        emailContent += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
-        emailContent += `\r\n${newBody}`;
+
+        if (args.attachments && args.attachments.length > 0) {
+          // Build multipart MIME message with attachments
+          const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+          emailContent += `To: ${newTo}\r\n`;
+          if (newCc) emailContent += `Cc: ${newCc}\r\n`;
+          if (newBcc) emailContent += `Bcc: ${newBcc}\r\n`;
+          emailContent += `Subject: ${newSubject}\r\n`;
+          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
+          emailContent += `\r\n`;
+
+          // Body part
+          emailContent += `--${boundary}\r\n`;
+          emailContent += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
+          emailContent += `\r\n`;
+          emailContent += `${newBody}\r\n`;
+
+          // Attachment parts
+          for (const attachment of args.attachments) {
+            emailContent += `--${boundary}\r\n`;
+            emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
+            emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
+            emailContent += `Content-Transfer-Encoding: base64\r\n`;
+            emailContent += `\r\n`;
+            // Split base64 data into 76-character lines per RFC 2045
+            const base64Lines = attachment.base64Data.match(/.{1,76}/g) || [];
+            emailContent += base64Lines.join('\r\n');
+            emailContent += `\r\n`;
+          }
+
+          emailContent += `--${boundary}--\r\n`;
+        } else {
+          // Simple message without attachments
+          emailContent += `To: ${newTo}\r\n`;
+          if (newCc) emailContent += `Cc: ${newCc}\r\n`;
+          if (newBcc) emailContent += `Bcc: ${newBcc}\r\n`;
+          emailContent += `Subject: ${newSubject}\r\n`;
+          emailContent += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
+          emailContent += `\r\n${newBody}`;
+        }
 
         const encodedEmail = Buffer.from(emailContent)
           .toString('base64')
@@ -809,17 +927,351 @@ export function registerGmailTools(options: GmailToolOptions) {
         result += `Draft ID: ${response.data.id}\n`;
         result += `To: ${newTo}\n`;
         if (newCc) result += `Cc: ${newCc}\n`;
+        if (newBcc) result += `Bcc: ${newBcc}\n`;
         result += `Subject: ${newSubject}\n`;
         result += '\n**Updated fields:**\n';
         if (args.to !== undefined) result += '- To\n';
         if (args.cc !== undefined) result += '- Cc\n';
+        if (args.bcc !== undefined) result += '- Bcc\n';
         if (args.subject !== undefined) result += '- Subject\n';
         if (args.body !== undefined) result += '- Body\n';
+        if (args.attachments !== undefined) result += `- Attachments (${args.attachments.length} files)\n`;
         result += `\nView drafts: ${draftsLink}`;
 
         return result;
       } catch (error: unknown) {
         throw new Error(formatToolError('updateGmailDraft', error));
+      }
+    },
+  });
+
+  // --- Add Attachment to Draft ---
+  server.addTool({
+    name: 'addAttachmentToDraft',
+    description:
+      'Add an attachment to an existing Gmail draft. The attachment is added to the draft without modifying other content.',
+    annotations: {
+      title: 'Add Attachment to Draft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to add the attachment to'),
+      filename: z.string().describe('Name of the file (e.g., "report.pdf")'),
+      mimeType: z
+        .string()
+        .describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
+      base64Data: z
+        .string()
+        .describe('Base64-encoded file content (standard base64, not base64url)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        // Get current draft
+        const currentDraft = await gmail.users.drafts.get({
+          userId: 'me',
+          id: args.draftId,
+          format: 'full',
+        });
+
+        const currentMessage = currentDraft.data.message;
+        const currentHeaders = currentMessage?.payload?.headers ?? [];
+
+        const getCurrentHeader = (name: string) =>
+          currentHeaders.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        // Extract current body and attachments
+        let bodyContent = '';
+        let bodyMimeType = 'text/plain';
+        const existingAttachments: { filename: string; mimeType: string; data: string }[] = [];
+
+        const extractParts = async (part: MessagePart) => {
+          if (part.mimeType === 'text/plain' && !part.filename && part.body?.data) {
+            bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
+            bodyMimeType = 'text/plain';
+          } else if (part.mimeType === 'text/html' && !part.filename && part.body?.data && !bodyContent) {
+            bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
+            bodyMimeType = 'text/html';
+          } else if (part.filename && part.body?.attachmentId) {
+            // Fetch attachment data
+            const attachmentResponse = await gmail.users.messages.attachments.get({
+              userId: 'me',
+              messageId: currentMessage?.id || '',
+              id: part.body.attachmentId,
+            });
+            if (attachmentResponse.data.data) {
+              existingAttachments.push({
+                filename: part.filename,
+                mimeType: part.mimeType || 'application/octet-stream',
+                data: attachmentResponse.data.data.replace(/-/g, '+').replace(/_/g, '/'),
+              });
+            }
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              await extractParts(subpart);
+            }
+          }
+        };
+
+        if (currentMessage?.payload) {
+          // Handle simple messages (no parts)
+          if (currentMessage.payload.body?.data && !currentMessage.payload.parts) {
+            bodyContent = Buffer.from(currentMessage.payload.body.data, 'base64').toString('utf8');
+            bodyMimeType = currentMessage.payload.mimeType || 'text/plain';
+          } else {
+            await extractParts(currentMessage.payload);
+          }
+        }
+
+        // Add the new attachment
+        existingAttachments.push({
+          filename: args.filename,
+          mimeType: args.mimeType,
+          data: args.base64Data,
+        });
+
+        // Rebuild the email with attachments
+        const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+        let emailContent = '';
+
+        emailContent += `To: ${getCurrentHeader('To')}\r\n`;
+        if (getCurrentHeader('Cc')) emailContent += `Cc: ${getCurrentHeader('Cc')}\r\n`;
+        if (getCurrentHeader('Bcc')) emailContent += `Bcc: ${getCurrentHeader('Bcc')}\r\n`;
+        emailContent += `Subject: ${getCurrentHeader('Subject')}\r\n`;
+        emailContent += `MIME-Version: 1.0\r\n`;
+        emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
+        emailContent += `\r\n`;
+
+        // Body part
+        emailContent += `--${boundary}\r\n`;
+        emailContent += `Content-Type: ${bodyMimeType}; charset=utf-8\r\n`;
+        emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
+        emailContent += `\r\n`;
+        emailContent += `${bodyContent}\r\n`;
+
+        // Attachment parts
+        for (const attachment of existingAttachments) {
+          emailContent += `--${boundary}\r\n`;
+          emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
+          emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
+          emailContent += `Content-Transfer-Encoding: base64\r\n`;
+          emailContent += `\r\n`;
+          const base64Lines = attachment.data.match(/.{1,76}/g) || [];
+          emailContent += base64Lines.join('\r\n');
+          emailContent += `\r\n`;
+        }
+
+        emailContent += `--${boundary}--\r\n`;
+
+        const encodedEmail = Buffer.from(emailContent)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        // Update the draft
+        const response = await gmail.users.drafts.update({
+          userId: 'me',
+          id: args.draftId,
+          requestBody: {
+            message: {
+              raw: encodedEmail,
+              threadId: currentMessage?.threadId,
+            },
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const draftsLink = getGmailDraftsUrl(accountEmail);
+
+        let result = `Successfully added attachment "${args.filename}" to draft.\n\n`;
+        result += `Draft ID: ${response.data.id}\n`;
+        result += `Total attachments: ${existingAttachments.length}\n`;
+        result += `Attachments: ${existingAttachments.map((a) => a.filename).join(', ')}\n`;
+        result += `\nView drafts: ${draftsLink}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('addAttachmentToDraft', error));
+      }
+    },
+  });
+
+  // --- Remove Attachment from Draft ---
+  server.addTool({
+    name: 'removeAttachmentFromDraft',
+    description:
+      'Remove an attachment from an existing Gmail draft by filename. The attachment is removed without modifying other content.',
+    annotations: {
+      title: 'Remove Attachment from Draft',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      draftId: z.string().describe('The draft ID to remove the attachment from'),
+      filename: z.string().describe('Name of the file to remove (must match exactly)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        // Get current draft
+        const currentDraft = await gmail.users.drafts.get({
+          userId: 'me',
+          id: args.draftId,
+          format: 'full',
+        });
+
+        const currentMessage = currentDraft.data.message;
+        const currentHeaders = currentMessage?.payload?.headers ?? [];
+
+        const getCurrentHeader = (name: string) =>
+          currentHeaders.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        // Extract current body and attachments
+        let bodyContent = '';
+        let bodyMimeType = 'text/plain';
+        const existingAttachments: { filename: string; mimeType: string; data: string }[] = [];
+
+        const extractParts = async (part: MessagePart) => {
+          if (part.mimeType === 'text/plain' && !part.filename && part.body?.data) {
+            bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
+            bodyMimeType = 'text/plain';
+          } else if (part.mimeType === 'text/html' && !part.filename && part.body?.data && !bodyContent) {
+            bodyContent = Buffer.from(part.body.data, 'base64').toString('utf8');
+            bodyMimeType = 'text/html';
+          } else if (part.filename && part.body?.attachmentId) {
+            // Fetch attachment data
+            const attachmentResponse = await gmail.users.messages.attachments.get({
+              userId: 'me',
+              messageId: currentMessage?.id || '',
+              id: part.body.attachmentId,
+            });
+            if (attachmentResponse.data.data) {
+              existingAttachments.push({
+                filename: part.filename,
+                mimeType: part.mimeType || 'application/octet-stream',
+                data: attachmentResponse.data.data.replace(/-/g, '+').replace(/_/g, '/'),
+              });
+            }
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              await extractParts(subpart);
+            }
+          }
+        };
+
+        if (currentMessage?.payload) {
+          // Handle simple messages (no parts)
+          if (currentMessage.payload.body?.data && !currentMessage.payload.parts) {
+            bodyContent = Buffer.from(currentMessage.payload.body.data, 'base64').toString('utf8');
+            bodyMimeType = currentMessage.payload.mimeType || 'text/plain';
+          } else {
+            await extractParts(currentMessage.payload);
+          }
+        }
+
+        // Check if attachment exists
+        const attachmentIndex = existingAttachments.findIndex(
+          (a) => a.filename === args.filename
+        );
+        if (attachmentIndex === -1) {
+          const availableFiles = existingAttachments.map((a) => a.filename).join(', ') || 'none';
+          throw new Error(
+            `Attachment "${args.filename}" not found in draft. Available attachments: ${availableFiles}`
+          );
+        }
+
+        // Remove the attachment
+        existingAttachments.splice(attachmentIndex, 1);
+
+        // Rebuild the email
+        let emailContent = '';
+
+        if (existingAttachments.length > 0) {
+          // Still have attachments, use multipart
+          const boundary = `boundary_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+          emailContent += `To: ${getCurrentHeader('To')}\r\n`;
+          if (getCurrentHeader('Cc')) emailContent += `Cc: ${getCurrentHeader('Cc')}\r\n`;
+          if (getCurrentHeader('Bcc')) emailContent += `Bcc: ${getCurrentHeader('Bcc')}\r\n`;
+          emailContent += `Subject: ${getCurrentHeader('Subject')}\r\n`;
+          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
+          emailContent += `\r\n`;
+
+          // Body part
+          emailContent += `--${boundary}\r\n`;
+          emailContent += `Content-Type: ${bodyMimeType}; charset=utf-8\r\n`;
+          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
+          emailContent += `\r\n`;
+          emailContent += `${bodyContent}\r\n`;
+
+          // Remaining attachment parts
+          for (const attachment of existingAttachments) {
+            emailContent += `--${boundary}\r\n`;
+            emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
+            emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
+            emailContent += `Content-Transfer-Encoding: base64\r\n`;
+            emailContent += `\r\n`;
+            const base64Lines = attachment.data.match(/.{1,76}/g) || [];
+            emailContent += base64Lines.join('\r\n');
+            emailContent += `\r\n`;
+          }
+
+          emailContent += `--${boundary}--\r\n`;
+        } else {
+          // No more attachments, use simple message
+          emailContent += `To: ${getCurrentHeader('To')}\r\n`;
+          if (getCurrentHeader('Cc')) emailContent += `Cc: ${getCurrentHeader('Cc')}\r\n`;
+          if (getCurrentHeader('Bcc')) emailContent += `Bcc: ${getCurrentHeader('Bcc')}\r\n`;
+          emailContent += `Subject: ${getCurrentHeader('Subject')}\r\n`;
+          emailContent += `Content-Type: ${bodyMimeType}; charset=utf-8\r\n`;
+          emailContent += `\r\n${bodyContent}`;
+        }
+
+        const encodedEmail = Buffer.from(emailContent)
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        // Update the draft
+        const response = await gmail.users.drafts.update({
+          userId: 'me',
+          id: args.draftId,
+          requestBody: {
+            message: {
+              raw: encodedEmail,
+              threadId: currentMessage?.threadId,
+            },
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const draftsLink = getGmailDraftsUrl(accountEmail);
+
+        let result = `Successfully removed attachment "${args.filename}" from draft.\n\n`;
+        result += `Draft ID: ${response.data.id}\n`;
+        result += `Remaining attachments: ${existingAttachments.length}\n`;
+        if (existingAttachments.length > 0) {
+          result += `Attachments: ${existingAttachments.map((a) => a.filename).join(', ')}\n`;
+        }
+        result += `\nView drafts: ${draftsLink}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('removeAttachmentFromDraft', error));
       }
     },
   });
@@ -929,6 +1381,608 @@ export function registerGmailTools(options: GmailToolOptions) {
         return `Successfully deleted draft ${args.draftId}.\n\nNote: Draft deletion is permanent and cannot be undone.`;
       } catch (error: unknown) {
         throw new Error(formatToolError('deleteGmailDraft', error));
+      }
+    },
+  });
+
+  // --- Get Gmail Attachment ---
+  server.addTool({
+    name: 'getGmailAttachment',
+    description:
+      'Download an attachment from a Gmail message. Returns the attachment as base64-encoded data along with metadata.',
+    annotations: {
+      title: 'Get Gmail Attachment',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The ID of the message containing the attachment'),
+      attachmentId: z
+        .string()
+        .describe('The attachment ID (from readGmailMessage attachment info)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId: args.messageId,
+          id: args.attachmentId,
+        });
+
+        const attachment = response.data;
+        const size = attachment.size || 0;
+
+        let result = '**Attachment Retrieved**\n\n';
+        result += `Message ID: ${args.messageId}\n`;
+        result += `Attachment ID: ${args.attachmentId}\n`;
+        result += `Size: ${size} bytes (${(size / 1024).toFixed(2)} KB)\n\n`;
+
+        if (attachment.data) {
+          // The data is already base64url encoded from Gmail API
+          result += `**Base64 Data (first 500 chars):**\n${attachment.data.substring(0, 500)}${attachment.data.length > 500 ? '...' : ''}\n\n`;
+          result += `**Full data length:** ${attachment.data.length} characters\n`;
+          result += `\nNote: Data is base64url encoded. To decode, replace - with + and _ with /, then base64 decode.`;
+        } else {
+          result += 'No attachment data available.';
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('getGmailAttachment', error));
+      }
+    },
+  });
+
+  // --- Mark as Read ---
+  server.addTool({
+    name: 'markAsRead',
+    description: 'Mark a Gmail message as read by removing the UNREAD label.',
+    annotations: {
+      title: 'Mark as Read',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The message ID to mark as read'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.messages.modify({
+          userId: 'me',
+          id: args.messageId,
+          requestBody: {
+            removeLabelIds: ['UNREAD'],
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const link = response.data.id
+          ? getGmailMessageUrl(response.data.id, accountEmail)
+          : undefined;
+
+        let result = `Successfully marked message ${args.messageId} as read.\n`;
+        result += `Current labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
+        if (link) {
+          result += `\nView message: ${link}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('markAsRead', error));
+      }
+    },
+  });
+
+  // --- Mark as Unread ---
+  server.addTool({
+    name: 'markAsUnread',
+    description: 'Mark a Gmail message as unread by adding the UNREAD label.',
+    annotations: {
+      title: 'Mark as Unread',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The message ID to mark as unread'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.messages.modify({
+          userId: 'me',
+          id: args.messageId,
+          requestBody: {
+            addLabelIds: ['UNREAD'],
+          },
+        });
+
+        const accountEmail = await getAccountEmail(args.account);
+        const link = response.data.id
+          ? getGmailMessageUrl(response.data.id, accountEmail)
+          : undefined;
+
+        let result = `Successfully marked message ${args.messageId} as unread.\n`;
+        result += `Current labels: ${(response.data.labelIds ?? []).join(', ')}\n`;
+        if (link) {
+          result += `\nView message: ${link}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('markAsUnread', error));
+      }
+    },
+  });
+
+  // --- List Gmail Threads ---
+  server.addTool({
+    name: 'listGmailThreads',
+    description:
+      'List email threads (conversations) from Gmail. Each thread contains all messages in a conversation.',
+    annotations: {
+      title: 'List Gmail Threads',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      maxResults: z
+        .number()
+        .optional()
+        .default(10)
+        .describe('Maximum number of threads to return (default: 10, max: 500)'),
+      labelIds: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by label IDs (e.g., ["INBOX", "UNREAD"])'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Search query (same syntax as Gmail search box, e.g., "from:user@example.com subject:test")'
+        ),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.threads.list({
+          userId: 'me',
+          maxResults: Math.min(args.maxResults || 10, 500),
+          labelIds: args.labelIds,
+          q: args.query,
+        });
+
+        const threads = response.data.threads ?? [];
+        const accountEmail = await getAccountEmail(args.account);
+
+        let result = `Found approximately ${response.data.resultSizeEstimate} threads.\n\n`;
+
+        if (threads.length === 0) {
+          result += 'No threads found.';
+        } else {
+          result += `Showing ${threads.length} threads:\n\n`;
+          for (let i = 0; i < threads.length; i++) {
+            const t = threads[i];
+            const link = t.id ? getGmailMessageUrl(t.id, accountEmail) : 'N/A';
+            result += `${i + 1}. Thread ID: ${t.id}\n`;
+            result += `   Snippet: ${t.snippet || '(no snippet)'}\n`;
+            result += `   Link: ${link}\n\n`;
+          }
+        }
+
+        if (response.data.nextPageToken) {
+          result += `\nMore threads available (next page token: ${response.data.nextPageToken})`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listGmailThreads', error));
+      }
+    },
+  });
+
+  // --- Read Gmail Thread ---
+  server.addTool({
+    name: 'readGmailThread',
+    description:
+      'Read a complete Gmail thread (conversation) including all messages. Returns full content of all messages in the thread.',
+    annotations: {
+      title: 'Read Gmail Thread',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      threadId: z.string().describe('The ID of the thread to read'),
+      format: z
+        .enum(['full', 'metadata', 'minimal'])
+        .optional()
+        .default('full')
+        .describe('Response format for messages in the thread'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.threads.get({
+          userId: 'me',
+          id: args.threadId,
+          format: args.format,
+        });
+
+        const thread = response.data;
+        const messages = thread.messages ?? [];
+        const accountEmail = await getAccountEmail(args.account);
+
+        const getHeader = (headers: { name?: string | null; value?: string | null }[], name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value;
+
+        const extractBody = (part: MessagePart): string => {
+          if (part.body?.data) {
+            return Buffer.from(part.body.data, 'base64').toString('utf8');
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/plain') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              if (subpart.mimeType === 'text/html') {
+                return extractBody(subpart);
+              }
+            }
+            for (const subpart of part.parts) {
+              const result = extractBody(subpart);
+              if (result) return result;
+            }
+          }
+          return '';
+        };
+
+        let result = `**Email Thread**\n\n`;
+        result += `Thread ID: ${thread.id}\n`;
+        result += `Messages in thread: ${messages.length}\n`;
+        result += `History ID: ${thread.historyId}\n\n`;
+        result += '---\n\n';
+
+        for (let i = 0; i < messages.length; i++) {
+          const message = messages[i];
+          const headers = message.payload?.headers ?? [];
+
+          result += `**Message ${i + 1} of ${messages.length}**\n`;
+          result += `ID: ${message.id}\n`;
+          result += `From: ${getHeader(headers, 'From') || 'N/A'}\n`;
+          result += `To: ${getHeader(headers, 'To') || 'N/A'}\n`;
+          if (getHeader(headers, 'Cc')) result += `Cc: ${getHeader(headers, 'Cc')}\n`;
+          result += `Subject: ${getHeader(headers, 'Subject') || 'N/A'}\n`;
+          result += `Date: ${getHeader(headers, 'Date') || 'N/A'}\n`;
+          result += `Labels: ${(message.labelIds ?? []).join(', ') || 'None'}\n\n`;
+
+          if (args.format === 'full' && message.payload) {
+            const body = extractBody(message.payload);
+            result += `**Body:**\n${body || '(empty)'}\n`;
+          } else if (message.snippet) {
+            result += `**Snippet:** ${message.snippet}\n`;
+          }
+
+          if (i < messages.length - 1) {
+            result += '\n---\n\n';
+          }
+        }
+
+        const link = thread.id ? getGmailMessageUrl(thread.id, accountEmail) : undefined;
+        if (link) {
+          result += `\n\nView thread in Gmail: ${link}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('readGmailThread', error));
+      }
+    },
+  });
+
+  // --- Batch Add Gmail Labels ---
+  server.addTool({
+    name: 'batchAddGmailLabels',
+    description:
+      'Add labels to multiple Gmail messages at once. More efficient than adding labels one by one.',
+    annotations: {
+      title: 'Batch Add Gmail Labels',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe('Array of message IDs to modify (max 1000)'),
+      labelIds: z
+        .array(z.string())
+        .min(1)
+        .describe('Array of label IDs to add (e.g., ["STARRED", "IMPORTANT"])'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        await gmail.users.messages.batchModify({
+          userId: 'me',
+          requestBody: {
+            ids: args.messageIds,
+            addLabelIds: args.labelIds,
+          },
+        });
+
+        let result = `Successfully added labels to ${args.messageIds.length} messages.\n\n`;
+        result += `Labels added: ${args.labelIds.join(', ')}\n`;
+        result += `Message IDs: ${args.messageIds.slice(0, 10).join(', ')}`;
+        if (args.messageIds.length > 10) {
+          result += ` ... and ${args.messageIds.length - 10} more`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('batchAddGmailLabels', error));
+      }
+    },
+  });
+
+  // --- Batch Remove Gmail Labels ---
+  server.addTool({
+    name: 'batchRemoveGmailLabels',
+    description:
+      'Remove labels from multiple Gmail messages at once. More efficient than removing labels one by one. Use to bulk archive (remove INBOX), bulk mark as read (remove UNREAD), etc.',
+    annotations: {
+      title: 'Batch Remove Gmail Labels',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe('Array of message IDs to modify (max 1000)'),
+      labelIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+          'Array of label IDs to remove (e.g., ["UNREAD"] to mark all as read, ["INBOX"] to archive all)'
+        ),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        await gmail.users.messages.batchModify({
+          userId: 'me',
+          requestBody: {
+            ids: args.messageIds,
+            removeLabelIds: args.labelIds,
+          },
+        });
+
+        let result = `Successfully removed labels from ${args.messageIds.length} messages.\n\n`;
+        result += `Labels removed: ${args.labelIds.join(', ')}\n`;
+        result += `Message IDs: ${args.messageIds.slice(0, 10).join(', ')}`;
+        if (args.messageIds.length > 10) {
+          result += ` ... and ${args.messageIds.length - 10} more`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('batchRemoveGmailLabels', error));
+      }
+    },
+  });
+
+  // --- List Gmail Filters ---
+  server.addTool({
+    name: 'listGmailFilters',
+    description:
+      'List all Gmail filters (rules that automatically process incoming messages based on criteria).',
+    annotations: {
+      title: 'List Gmail Filters',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.settings.filters.list({
+          userId: 'me',
+        });
+
+        const filters = response.data.filter ?? [];
+
+        let result = `**Gmail Filters (${filters.length} total)**\n\n`;
+
+        if (filters.length === 0) {
+          result += 'No filters found.';
+          return result;
+        }
+
+        for (let i = 0; i < filters.length; i++) {
+          const filter = filters[i];
+          const criteria = filter.criteria || {};
+          const action = filter.action || {};
+
+          result += `**${i + 1}. Filter ID: ${filter.id}**\n`;
+          result += '   Criteria:\n';
+          if (criteria.from) result += `     - From: ${criteria.from}\n`;
+          if (criteria.to) result += `     - To: ${criteria.to}\n`;
+          if (criteria.subject) result += `     - Subject: ${criteria.subject}\n`;
+          if (criteria.query) result += `     - Query: ${criteria.query}\n`;
+          if (criteria.hasAttachment) result += `     - Has attachment: yes\n`;
+          if (criteria.size) result += `     - Size: ${criteria.sizeComparison} ${criteria.size} bytes\n`;
+
+          result += '   Actions:\n';
+          if (action.addLabelIds?.length)
+            result += `     - Add labels: ${action.addLabelIds.join(', ')}\n`;
+          if (action.removeLabelIds?.length)
+            result += `     - Remove labels: ${action.removeLabelIds.join(', ')}\n`;
+          if (action.forward) result += `     - Forward to: ${action.forward}\n`;
+
+          result += '\n';
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('listGmailFilters', error));
+      }
+    },
+  });
+
+  // --- Create Gmail Filter ---
+  server.addTool({
+    name: 'createGmailFilter',
+    description:
+      'Create a Gmail filter to automatically process incoming messages. Filters can add/remove labels, forward messages, or archive them.',
+    annotations: {
+      title: 'Create Gmail Filter',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      // Criteria (at least one required)
+      from: z.string().optional().describe('Filter emails from this sender'),
+      to: z.string().optional().describe('Filter emails to this recipient'),
+      subject: z.string().optional().describe('Filter emails with this subject'),
+      query: z
+        .string()
+        .optional()
+        .describe('Filter using Gmail search query syntax (most flexible option)'),
+      hasAttachment: z.boolean().optional().describe('Filter emails that have attachments'),
+      // Actions (at least one required)
+      addLabelIds: z
+        .array(z.string())
+        .optional()
+        .describe('Label IDs to add to matching emails'),
+      removeLabelIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Label IDs to remove (e.g., ["INBOX"] to archive, ["UNREAD"] to mark as read)'
+        ),
+      forward: z.string().optional().describe('Email address to forward matching emails to'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        // Validate that at least one criteria is provided
+        const hasCriteria =
+          args.from || args.to || args.subject || args.query || args.hasAttachment;
+        if (!hasCriteria) {
+          throw new Error('At least one filter criteria must be provided (from, to, subject, query, or hasAttachment)');
+        }
+
+        // Validate that at least one action is provided
+        const hasAction =
+          (args.addLabelIds && args.addLabelIds.length > 0) ||
+          (args.removeLabelIds && args.removeLabelIds.length > 0) ||
+          args.forward;
+        if (!hasAction) {
+          throw new Error('At least one filter action must be provided (addLabelIds, removeLabelIds, or forward)');
+        }
+
+        const gmail = await getGmailClient(args.account);
+
+        const response = await gmail.users.settings.filters.create({
+          userId: 'me',
+          requestBody: {
+            criteria: {
+              from: args.from,
+              to: args.to,
+              subject: args.subject,
+              query: args.query,
+              hasAttachment: args.hasAttachment,
+            },
+            action: {
+              addLabelIds: args.addLabelIds,
+              removeLabelIds: args.removeLabelIds,
+              forward: args.forward,
+            },
+          },
+        });
+
+        const filter = response.data;
+
+        let result = 'Successfully created Gmail filter.\n\n';
+        result += `Filter ID: ${filter.id}\n\n`;
+        result += '**Criteria:**\n';
+        if (args.from) result += `- From: ${args.from}\n`;
+        if (args.to) result += `- To: ${args.to}\n`;
+        if (args.subject) result += `- Subject: ${args.subject}\n`;
+        if (args.query) result += `- Query: ${args.query}\n`;
+        if (args.hasAttachment) result += `- Has attachment: yes\n`;
+        result += '\n**Actions:**\n';
+        if (args.addLabelIds?.length) result += `- Add labels: ${args.addLabelIds.join(', ')}\n`;
+        if (args.removeLabelIds?.length)
+          result += `- Remove labels: ${args.removeLabelIds.join(', ')}\n`;
+        if (args.forward) result += `- Forward to: ${args.forward}\n`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('createGmailFilter', error));
+      }
+    },
+  });
+
+  // --- Delete Gmail Filter ---
+  server.addTool({
+    name: 'deleteGmailFilter',
+    description: 'Delete a Gmail filter by its ID.',
+    annotations: {
+      title: 'Delete Gmail Filter',
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      filterId: z.string().describe('The ID of the filter to delete (from listGmailFilters)'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        await gmail.users.settings.filters.delete({
+          userId: 'me',
+          id: args.filterId,
+        });
+
+        return `Successfully deleted filter ${args.filterId}.`;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('deleteGmailFilter', error));
       }
     },
   });

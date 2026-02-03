@@ -1,6 +1,6 @@
 # Google Workspace MCP Server
 
-FastMCP server with 71+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms.
+FastMCP server with 83+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, and Forms.
 
 ## Multi-Account Support
 
@@ -39,7 +39,7 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Comments | 6 | `listComments`, `getComment`, `addComment`, `replyToComment`, `resolveComment`, `deleteComment` |
 | Sheets | 8 | `readSpreadsheet`, `writeSpreadsheet`, `appendSpreadsheetRows`, `clearSpreadsheetRange`, `createSpreadsheet`, `listGoogleSheets` |
 | Drive | 13 | `listGoogleDocs`, `searchGoogleDocs`, `getDocumentInfo`, `createFolder`, `moveFile`, `copyFile`, `createDocument` |
-| Gmail | 13 | `listGmailMessages`, `readGmailMessage`, `searchGmail`, `listGmailLabels`, `addGmailLabel`, `removeGmailLabel`, `createGmailDraft`, `listGmailDrafts`, `readGmailDraft`, `updateGmailDraft`, `sendGmailDraft`, `deleteGmailDraft`, `deleteGmailMessage` |
+| Gmail | 25 | `listGmailMessages`, `readGmailMessage`, `searchGmail`, `getGmailAttachment`, `markAsRead`, `markAsUnread`, `listGmailThreads`, `readGmailThread`, `listGmailLabels`, `addGmailLabel`, `removeGmailLabel`, `batchAddGmailLabels`, `batchRemoveGmailLabels`, `createGmailDraft`, `listGmailDrafts`, `readGmailDraft`, `updateGmailDraft`, `addAttachmentToDraft`, `removeAttachmentFromDraft`, `sendGmailDraft`, `deleteGmailDraft`, `deleteGmailMessage`, `listGmailFilters`, `createGmailFilter`, `deleteGmailFilter` |
 | Calendar | 6 | `listCalendars`, `listCalendarEvents`, `getCalendarEvent`, `createCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent` |
 | Slides | 5 | `listPresentations`, `readPresentation`, `createPresentation`, `addSlide`, `addTextToSlide` |
 | Forms | 5 | `listForms`, `readForm`, `getFormResponses`, `createForm`, `addFormQuestion` |
