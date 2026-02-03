@@ -1,13 +1,71 @@
 // src/types.ts
 import { z } from 'zod';
-import { docs_v1 } from 'googleapis';
+import { docs_v1, drive_v3, gmail_v1, slides_v1, forms_v1, sheets_v4, calendar_v3 } from 'googleapis';
+import { FastMCP } from 'fastmcp';
 
-// --- Helper function for hex color validation ---
+// --- FastMCP Server Types ---
+// Session auth type - matches FastMCP's internal type
+export type FastMCPSessionAuth = Record<string, unknown> | undefined;
+
+// Common type for FastMCP server instance
+export type FastMCPServer = FastMCP<FastMCPSessionAuth>;
+
+// --- Google API Client Type Aliases ---
+export type DocsClient = docs_v1.Docs;
+export type DriveClient = drive_v3.Drive;
+export type SheetsClient = sheets_v4.Sheets;
+export type GmailClient = gmail_v1.Gmail;
+export type CalendarClient = calendar_v3.Calendar;
+export type SlidesClient = slides_v1.Slides;
+export type FormsClient = forms_v1.Forms;
+
+// --- Google Docs API Types ---
+export type StructuralElement = docs_v1.Schema$StructuralElement;
+export type ParagraphElement = docs_v1.Schema$ParagraphElement;
+export type Paragraph = docs_v1.Schema$Paragraph;
+export type DocsTable = docs_v1.Schema$Table;
+export type TableRow = docs_v1.Schema$TableRow;
+export type TableCell = docs_v1.Schema$TableCell;
+export type TextRun = docs_v1.Schema$TextRun;
+
+// --- Google Drive API Types ---
+export type DriveComment = drive_v3.Schema$Comment;
+export type DriveReply = drive_v3.Schema$Reply;
+
+// --- Gmail API Types ---
+export type MessagePart = gmail_v1.Schema$MessagePart;
+
+// --- Google Slides API Types ---
+export type PageElement = slides_v1.Schema$PageElement;
+export type SlidesRequest = slides_v1.Schema$Request;
+
+// --- Google Forms API Types ---
+export type FormsQuestion = forms_v1.Schema$Question;
+
+// --- Document Content Interface ---
+export interface DocumentContent {
+  body?: {
+    content?: StructuralElement[];
+  };
+}
+
+// --- Color Types and Utilities ---
+
+/** RGB color with values in 0-1 range (Google API format) */
+export interface RgbColor {
+  red: number;
+  green: number;
+  blue: number;
+}
+
 export const hexColorRegex = /^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 export const validateHexColor = (color: string) => hexColorRegex.test(color);
 
-// --- Helper function for Hex to RGB conversion ---
-export function hexToRgbColor(hex: string): docs_v1.Schema$RgbColor | null {
+/**
+ * Converts hex color string to RGB color object (0-1 range)
+ * Supports both 3-char (#RGB) and 6-char (#RRGGBB) formats
+ */
+export function hexToRgbColor(hex: string): RgbColor | null {
   if (!hex) return null;
   let hexClean = hex.startsWith('#') ? hex.slice(1) : hex;
 
