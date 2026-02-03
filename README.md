@@ -338,6 +338,9 @@ npx google-workspace-mcp config show                # Show current configuration
 
 # Server status
 npx google-workspace-mcp status                     # Check if server is ready
+
+# Read-only mode (blocks all write operations)
+npx google-workspace-mcp serve --read-only
 ```
 
 #### Testing API Permissions
@@ -353,6 +356,28 @@ npx google-workspace-mcp accounts test-permissions personal
 ```
 
 This command tests access to all 7 Google services (Drive, Docs, Sheets, Gmail, Calendar, Slides, Forms) and reports which permissions are working and which need attention. Use this to diagnose permission issues after adding an account.
+
+#### Read-Only Mode
+
+Start the server in read-only mode to disable all write operations:
+
+```bash
+npx google-workspace-mcp serve --read-only
+
+# Or via environment variable
+GOOGLE_MCP_READ_ONLY=true npx google-workspace-mcp serve
+```
+
+In read-only mode:
+- Tools that modify data (send emails, edit documents, create events, etc.) are blocked
+- Read operations (list, search, read) continue to work normally
+- Blocked tools show `[READ-ONLY MODE - DISABLED]` in their description
+- Attempting to use a blocked tool returns an error message
+
+This is useful for:
+- Safe exploration of your Google Workspace data
+- Demos and testing without risk of accidental changes
+- Restricting access when you only need to read data
 
 #### Option B: Manual Authorization (Legacy)
 
@@ -769,9 +794,15 @@ While this MCP server provides comprehensive Google Docs, Sheets, and Drive func
 
 ---
 
+## Disclaimer
+
+This is an independent, open-source project and is **not affiliated with, endorsed by, or sponsored by Google LLC**. "Google", "Google Workspace", "Google Docs", "Gmail", "Google Calendar", "Google Drive", "Google Sheets", "Google Slides", and "Google Forms" are trademarks of Google LLC.
+
+This project uses official Google APIs through the user's own Google Cloud credentials. The authors are not responsible for any misuse or for any damages arising from the use of this software.
+
 ## License
 
-This project is licensed under the MIT License - see the `LICENSE` file for details. (Note: You should add a `LICENSE` file containing the MIT License text to your repository).
+This project is licensed under the MIT License - see the `LICENSE` file for details.
 
 ## Star History
 

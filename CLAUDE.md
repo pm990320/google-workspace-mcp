@@ -92,7 +92,20 @@ npx google-workspace-mcp accounts test-permissions  # Test API permissions for a
 npx google-workspace-mcp accounts test-permissions <name>  # Test a specific account
 npx google-workspace-mcp status      # Check server readiness
 npx google-workspace-mcp config show # Show configuration
+npx google-workspace-mcp serve --read-only  # Start in read-only mode (blocks write operations)
 ```
+
+## Read-Only Mode
+
+Start the server with `--read-only` to disable all write operations:
+
+```bash
+npx google-workspace-mcp serve --read-only
+# or via environment variable
+GOOGLE_MCP_READ_ONLY=true npx google-workspace-mcp serve
+```
+
+In read-only mode, tools with `readOnlyHint: false` are blocked at runtime and return an error. This is useful for safe exploration or when you want to prevent accidental modifications.
 
 ## Source Files (for implementation details)
 
@@ -112,6 +125,7 @@ npx google-workspace-mcp config show # Show configuration
 | `src/tools/calendar.tools.ts` | Calendar tool definitions |
 | `src/tools/slides.tools.ts` | Slides tool definitions |
 | `src/tools/forms.tools.ts` | Forms tool definitions |
+| `src/serverWrapper.ts` | Read-only mode enforcement wrapper |
 
 ## See Also
 
