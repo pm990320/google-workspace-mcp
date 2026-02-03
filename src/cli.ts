@@ -2,7 +2,6 @@
 // src/cli.ts - CLI entrypoint for Google Workspace MCP Server
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { exec } from 'child_process';
 import {
   initializeAccounts,
@@ -11,9 +10,36 @@ import {
   removeAccount,
   getConfigDir,
   getCredentialsPath,
-  hasAccounts,
   getAccountClients,
+  AccountClients,
 } from './accounts.js';
+
+/** Type guard for errors with a message property */
+function isErrorWithMessage(error: unknown): error is { message: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as { message: unknown }).message === 'string'
+  );
+}
+
+/** Type guard for Google API errors with a code property */
+function isGoogleApiError(error: unknown): error is { code: number; message: string } {
+  return (
+    isErrorWithMessage(error) &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'number'
+  );
+}
+
+/** Get error message from unknown error */
+function getErrorMessage(error: unknown): string {
+  if (isErrorWithMessage(error)) {
+    return error.message;
+  }
+  return String(error);
+}
 
 // Helper to open URL in browser (cross-platform)
 function openBrowser(url: string): void {
@@ -51,7 +77,12 @@ program
   .command('serve')
   .alias('mcp')
   .description('Start the MCP server (for use with Claude Desktop, VS Code, etc.)')
-  .action(async () => {
+  .option('--read-only', 'Run in read-only mode (block all write operations)')
+  .action(async (options: { readOnly?: boolean }) => {
+    // Set env var for server.ts to pick up
+    if (options.readOnly) {
+      process.env.GOOGLE_MCP_READ_ONLY = 'true';
+    }
     // Dynamically import and start the server
     await import('./server.js');
   });
@@ -220,9 +251,9 @@ accountsCmd
       console.log(`✅ Account "${name}" added successfully!`);
       console.log('');
       console.log('You can now use this account with the MCP server.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('');
-      console.error(`❌ Failed to add account: ${error.message}`);
+      console.error(`❌ Failed to add account: ${getErrorMessage(error)}`);
       process.exit(1);
     }
   });
@@ -236,8 +267,8 @@ accountsCmd
     try {
       await removeAccount(name);
       console.log(`✅ Account "${name}" removed successfully.`);
-    } catch (error: any) {
-      console.error(`❌ Failed to remove account: ${error.message}`);
+    } catch (error: unknown) {
+      console.error(`❌ Failed to remove account: ${getErrorMessage(error)}`);
       process.exit(1);
     }
   });
@@ -269,27 +300,21 @@ accountsCmd
 
     console.log(`\n🔍 Testing API permissions for ${accountsToTest.length} account(s)...\n`);
 
-    const services = [
-      { name: 'Drive', test: async (clients: any) => await clients.drive.files.list({ pageSize: 1 }) },
-      { name: 'Docs', test: async (clients: any) => await clients.docs.documents.get({ documentId: 'test' }).catch((e: any) => {
-        // 404 means we have access but doc doesn't exist - that's OK
-        if (e.code === 404) return { status: 200 };
+    /** Helper to handle 404 errors as success (resource doesn't exist but we have access) */
+    const handle404 = (promise: Promise<unknown>): Promise<unknown> =>
+      promise.catch((e: unknown) => {
+        if (isGoogleApiError(e) && e.code === 404) return { status: 200 };
         throw e;
-      })},
-      { name: 'Sheets', test: async (clients: any) => await clients.sheets.spreadsheets.get({ spreadsheetId: 'test' }).catch((e: any) => {
-        if (e.code === 404) return { status: 200 };
-        throw e;
-      })},
-      { name: 'Gmail', test: async (clients: any) => await clients.gmail.users.labels.list({ userId: 'me' }) },
-      { name: 'Calendar', test: async (clients: any) => await clients.calendar.calendarList.list({ maxResults: 1 }) },
-      { name: 'Slides', test: async (clients: any) => await clients.slides.presentations.get({ presentationId: 'test' }).catch((e: any) => {
-        if (e.code === 404) return { status: 200 };
-        throw e;
-      })},
-      { name: 'Forms', test: async (clients: any) => await clients.forms.forms.get({ formId: 'test' }).catch((e: any) => {
-        if (e.code === 404) return { status: 200 };
-        throw e;
-      })},
+      });
+
+    const services: Array<{ name: string; test: (clients: AccountClients) => Promise<unknown> }> = [
+      { name: 'Drive', test: async (clients) => await clients.drive.files.list({ pageSize: 1 }) },
+      { name: 'Docs', test: async (clients) => await handle404(clients.docs.documents.get({ documentId: 'test' })) },
+      { name: 'Sheets', test: async (clients) => await handle404(clients.sheets.spreadsheets.get({ spreadsheetId: 'test' })) },
+      { name: 'Gmail', test: async (clients) => await clients.gmail.users.labels.list({ userId: 'me' }) },
+      { name: 'Calendar', test: async (clients) => await clients.calendar.calendarList.list({ maxResults: 1 }) },
+      { name: 'Slides', test: async (clients) => await handle404(clients.slides.presentations.get({ presentationId: 'test' })) },
+      { name: 'Forms', test: async (clients) => await handle404(clients.forms.forms.get({ formId: 'test' })) },
     ];
 
     let totalIssues = 0;
@@ -305,9 +330,9 @@ accountsCmd
           try {
             await service.test(clients);
             console.log(`   ✅ ${service.name}`);
-          } catch (error: any) {
+          } catch (error: unknown) {
             accountIssues++;
-            const message = error.message || 'Unknown error';
+            const message = getErrorMessage(error);
             if (message.includes('insufficient') || message.includes('permission') || message.includes('403')) {
               console.log(`   ❌ ${service.name}: Permission denied`);
             } else if (message.includes('401') || message.includes('invalid_grant')) {
@@ -322,8 +347,8 @@ accountsCmd
           totalIssues += accountIssues;
           console.log(`   ⚠️  ${accountIssues} service(s) need attention`);
         }
-      } catch (error: any) {
-        console.log(`   ❌ Failed to load account: ${error.message}`);
+      } catch (error: unknown) {
+        console.log(`   ❌ Failed to load account: ${getErrorMessage(error)}`);
         totalIssues++;
       }
 

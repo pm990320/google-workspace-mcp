@@ -23,6 +23,9 @@ import { registerFormsTools } from './tools/forms.tools.js';
 // Import multi-account management
 import { initializeAccounts, getAccountClients } from './accounts.js';
 
+// Import server wrapper for read-only mode
+import { createServerWithConfig, getServerConfigFromEnv } from './serverWrapper.js';
+
 // --- Initialization ---
 let accountsInitialized = false;
 
@@ -42,10 +45,16 @@ process.on('unhandledRejection', (reason, _promise) => {
   console.error('Unhandled Promise Rejection:', reason);
 });
 
-const server = new FastMCP({
+// --- Server Configuration ---
+const serverConfig = getServerConfigFromEnv();
+
+const baseServer = new FastMCP({
   name: 'Google Workspace MCP Server',
   version: '2.0.0',
 });
+
+// Wrap server to enforce read-only mode if configured
+const server = createServerWithConfig(baseServer, serverConfig);
 
 // --- Client Getters for each service ---
 async function getDocsClient(accountName: string): Promise<docs_v1.Docs> {
@@ -122,7 +131,13 @@ registerFormsTools(server, getFormsClient, getDriveClient);
 async function startServer() {
   try {
     await ensureAccountsInitialized();
-    console.error('Starting Google Workspace MCP server...');
+
+    if (serverConfig.readOnly) {
+      console.error('⚠️  Starting Google Workspace MCP server in READ-ONLY mode...');
+      console.error('   Write operations are disabled. Use --read-only=false or remove the flag to enable writes.');
+    } else {
+      console.error('Starting Google Workspace MCP server...');
+    }
 
     const configToUse = {
       transportType: 'stdio' as const,
@@ -136,8 +151,9 @@ async function startServer() {
     console.error(
       'Process-level error handling configured to prevent crashes from timeout errors.'
     );
-  } catch (startError: any) {
-    console.error('FATAL: Server failed to start:', startError.message || startError);
+  } catch (startError: unknown) {
+    const message = startError instanceof Error ? startError.message : String(startError);
+    console.error('FATAL: Server failed to start:', message);
     process.exit(1);
   }
 }
