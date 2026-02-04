@@ -512,6 +512,144 @@ export function registerSheetsTools(options: SheetsToolOptions) {
     },
   });
 
+  // --- Download Spreadsheet ---
+  server.addTool({
+    name: 'downloadSpreadsheet',
+    description:
+      'Downloads a Google Spreadsheet as CSV or Excel (XLSX) format and saves it to the local filesystem. CSV exports a single sheet; XLSX exports the entire workbook.',
+    annotations: {
+      title: 'Download Spreadsheet',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      spreadsheetId: z.string().describe('The ID of the Google Spreadsheet (from the URL).'),
+      format: z
+        .enum(['csv', 'xlsx'])
+        .describe('Export format. CSV exports a single sheet; XLSX exports the entire workbook.'),
+      outputPath: z
+        .string()
+        .min(1)
+        .describe(
+          'Absolute path where the file should be saved (e.g., "/Users/name/Downloads/data.csv").'
+        ),
+      sheetName: z
+        .string()
+        .optional()
+        .describe(
+          'Name of the sheet to export (for CSV format). If not provided, exports the first sheet. Use getSpreadsheetInfo to see available sheet names.'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const { createWriteStream } = await import('fs');
+      const { stat } = await import('fs/promises');
+      const { pipeline } = await import('stream/promises');
+      const { Readable } = await import('stream');
+      const pathModule = await import('path');
+
+      const sheets = await getSheetsClient(args.account);
+      log.info(
+        `Downloading spreadsheet ${args.spreadsheetId} as ${args.format.toUpperCase()} to ${args.outputPath}`
+      );
+
+      try {
+        // Get spreadsheet metadata
+        const metadata = await SheetsHelpers.getSpreadsheetMetadata(sheets, args.spreadsheetId);
+
+        if (args.format === 'csv') {
+          // For CSV, read sheet data and stream to file
+          let sheetToExport = metadata.sheets?.[0];
+
+          if (args.sheetName) {
+            sheetToExport = metadata.sheets?.find(
+              (s) => s.properties?.title === args.sheetName
+            );
+            if (!sheetToExport) {
+              const availableSheets =
+                metadata.sheets?.map((s) => s.properties?.title).join(', ') || 'none';
+              throw new UserError(
+                `Sheet "${args.sheetName}" not found. Available sheets: ${availableSheets}`
+              );
+            }
+          }
+
+          const sheetTitle = sheetToExport?.properties?.title || 'Sheet1';
+
+          // Read all data from the sheet (Sheets API doesn't support streaming reads)
+          const range = `'${sheetTitle}'`;
+          const response = await SheetsHelpers.readRange(sheets, args.spreadsheetId, range);
+          const values = response.values ?? [];
+
+          // Ensure output path has correct extension
+          let outputPath = args.outputPath;
+          if (!outputPath.toLowerCase().endsWith('.csv')) {
+            outputPath = outputPath + '.csv';
+          }
+
+          // Stream rows to file to avoid building full CSV string in memory
+          const rowCount = values.length;
+          async function* generateCsvRows() {
+            for (let i = 0; i < values.length; i++) {
+              const row = values[i];
+              const csvRow = row
+                .map((cell) => {
+                  const cellStr = cell?.toString() ?? '';
+                  if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                    return `"${cellStr.replace(/"/g, '""')}"`;
+                  }
+                  return cellStr;
+                })
+                .join(',');
+              yield csvRow + (i < values.length - 1 ? '\n' : '');
+            }
+          }
+
+          const csvStream = Readable.from(generateCsvRows());
+          const writeStream = createWriteStream(outputPath, { encoding: 'utf-8' });
+          await pipeline(csvStream, writeStream);
+
+          const fileStats = await stat(outputPath);
+          return `**Saved:** ${pathModule.basename(outputPath)}\n**Path:** ${outputPath}\n**Format:** CSV\n**Sheet:** ${sheetTitle}\n**Rows:** ${rowCount.toLocaleString()}\n**Size:** ${fileStats.size.toLocaleString()} bytes`;
+        } else {
+          // For XLSX, stream directly from Drive API to file
+          const drive = await getDriveClient(args.account);
+          const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+          // Ensure output path has correct extension
+          let outputPath = args.outputPath;
+          if (!outputPath.toLowerCase().endsWith('.xlsx')) {
+            outputPath = outputPath + '.xlsx';
+          }
+
+          const xlsxResponse = await drive.files.export(
+            {
+              fileId: args.spreadsheetId,
+              mimeType: mimeType,
+            },
+            { responseType: 'stream' }
+          );
+
+          const writeStream = createWriteStream(outputPath);
+          await pipeline(xlsxResponse.data as NodeJS.ReadableStream, writeStream);
+
+          const fileStats = await stat(outputPath);
+          return `**Saved:** ${pathModule.basename(outputPath)}\n**Path:** ${outputPath}\n**Format:** Excel (XLSX)\n**Sheets:** ${metadata.sheets?.length || 1}\n**Size:** ${fileStats.size.toLocaleString()} bytes`;
+        }
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error downloading spreadsheet ${args.spreadsheetId}: ${message}`);
+        if (error instanceof UserError) throw error;
+        throw new UserError(`Failed to download spreadsheet: ${message}`);
+      }
+    },
+  });
+
   // --- List Google Sheets ---
   server.addTool({
     name: 'listGoogleSheets',

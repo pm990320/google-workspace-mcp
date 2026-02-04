@@ -152,6 +152,38 @@ Steps:
 
 These examples demonstrate the power and flexibility of the enhanced Google Docs & Drive MCP Server, showcasing how AI assistants can help with sophisticated document formatting, structuring, and comprehensive file management tasks.
 
+## Google Sheets Tasks
+
+## 16. Download Spreadsheet Data for Analysis
+
+```
+Task: "Export my sales data spreadsheet for offline analysis."
+
+Steps:
+1. Use listGoogleSheets to find the spreadsheet by name
+2. Use getSpreadsheetInfo to see available sheets
+3. Download as CSV for a single sheet using downloadSpreadsheet:
+   - Specify format: 'csv'
+   - Specify sheetName: 'Q1 Sales'
+   - Specify outputPath: '/path/to/sales-q1.csv'
+4. Or download entire workbook as XLSX:
+   - Specify format: 'xlsx'
+   - Specify outputPath: '/path/to/sales-report.xlsx'
+```
+
+## 17. Batch Export Multiple Sheets
+
+```
+Task: "Export each sheet from my budget spreadsheet as separate CSV files."
+
+Steps:
+1. Use getSpreadsheetInfo to list all sheets in the spreadsheet
+2. For each sheet, use downloadSpreadsheet with format 'csv':
+   - Specify the sheetName for each
+   - Use descriptive outputPath like '/exports/budget-{sheetName}.csv'
+3. Report the list of exported files with their sizes
+```
+
 ## Google Drive Management Tasks
 
 ## 11. Organize Project Files Automatically
