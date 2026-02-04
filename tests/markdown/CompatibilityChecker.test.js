@@ -1,8 +1,7 @@
 // tests/markdown/CompatibilityChecker.test.js
 import { CompatibilityChecker } from '../../dist/markdown/CompatibilityChecker.js';
 import { IncompatibleElementType } from '../../dist/markdown/types.js';
-import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, expect } from 'vitest';
 
 describe('CompatibilityChecker', () => {
   let checker;
@@ -32,8 +31,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
-      assert.strictEqual(result.issues.length, 0);
+      expect(result.compatible).toBe(true);
+      expect(result.issues.length).toBe(0);
     });
 
     it('should return compatible for document with headings and formatting', () => {
@@ -80,7 +79,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
 
     it('should return compatible for document with bullet lists', () => {
@@ -104,7 +103,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
 
     it('should return compatible for document with simple table', () => {
@@ -134,7 +133,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
 
     it('should return compatible for document with inline images', () => {
@@ -168,7 +167,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
 
     it('should return compatible for document with links', () => {
@@ -194,7 +193,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
 
     it('should return compatible for document with section breaks', () => {
@@ -219,7 +218,7 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, true);
+      expect(result.compatible).toBe(true);
     });
   });
 
@@ -233,9 +232,9 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues.length, 1);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.HEADER);
+      expect(result.compatible).toBe(false);
+      expect(result.issues.length).toBe(1);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.HEADER);
     });
 
     it('should reject document with footers', () => {
@@ -247,8 +246,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.FOOTER);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.FOOTER);
     });
 
     it('should reject document with footnotes', () => {
@@ -260,8 +259,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.FOOTNOTE);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.FOOTNOTE);
     });
 
     it('should reject document with equations', () => {
@@ -284,8 +283,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.EQUATION);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.EQUATION);
     });
 
     it('should reject document with @mentions', () => {
@@ -308,8 +307,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.PERSON);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.PERSON);
     });
 
     it('should reject document with rich links (smart chips)', () => {
@@ -332,8 +331,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.RICH_LINK);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.RICH_LINK);
     });
 
     it('should reject document with table of contents', () => {
@@ -350,8 +349,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.TABLE_OF_CONTENTS);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.TABLE_OF_CONTENTS);
     });
 
     it('should reject document with positioned objects', () => {
@@ -365,8 +364,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.POSITIONED_OBJECT);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.POSITIONED_OBJECT);
     });
 
     it('should reject document with embedded drawings', () => {
@@ -398,8 +397,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.DRAWING);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.DRAWING);
     });
 
     it('should reject document with merged table cells', () => {
@@ -427,8 +426,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.MERGED_TABLE_CELL);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.MERGED_TABLE_CELL);
     });
 
     it('should reject document with row-spanned table cells', () => {
@@ -456,8 +455,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.MERGED_TABLE_CELL);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.MERGED_TABLE_CELL);
     });
 
     it('should reject document with footnote references in text', () => {
@@ -483,8 +482,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.FOOTNOTE);
+      expect(result.compatible).toBe(false);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.FOOTNOTE);
     });
   });
 
@@ -509,8 +508,8 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
-      assert.strictEqual(result.issues.length, 3);
+      expect(result.compatible).toBe(false);
+      expect(result.issues.length).toBe(3);
     });
 
     it('should deduplicate issues of the same type', () => {
@@ -532,17 +531,17 @@ describe('CompatibilityChecker', () => {
       };
 
       const result = checker.check(doc);
-      assert.strictEqual(result.compatible, false);
+      expect(result.compatible).toBe(false);
       // Should only have one EQUATION issue, not two
-      assert.strictEqual(result.issues.length, 1);
-      assert.strictEqual(result.issues[0].type, IncompatibleElementType.EQUATION);
+      expect(result.issues.length).toBe(1);
+      expect(result.issues[0].type).toBe(IncompatibleElementType.EQUATION);
     });
   });
 
   describe('formatIssues()', () => {
     it('should return success message for empty issues', () => {
       const message = CompatibilityChecker.formatIssues([]);
-      assert.strictEqual(message, 'Document is compatible with markdown editing.');
+      expect(message).toBe('Document is compatible with markdown editing.');
     });
 
     it('should format single issue correctly', () => {
@@ -553,9 +552,9 @@ describe('CompatibilityChecker', () => {
         },
       ];
       const message = CompatibilityChecker.formatIssues(issues);
-      assert.ok(message.includes('cannot be edited as markdown'));
-      assert.ok(message.includes('Document contains equations.'));
-      assert.ok(message.includes('Use readGoogleDoc'));
+      expect(message).toContain('cannot be edited as markdown');
+      expect(message).toContain('Document contains equations.');
+      expect(message).toContain('Use readGoogleDoc');
     });
 
     it('should format multiple issues correctly', () => {
@@ -564,8 +563,8 @@ describe('CompatibilityChecker', () => {
         { type: IncompatibleElementType.HEADER, message: 'Has headers.' },
       ];
       const message = CompatibilityChecker.formatIssues(issues);
-      assert.ok(message.includes('Has equations.'));
-      assert.ok(message.includes('Has headers.'));
+      expect(message).toContain('Has equations.');
+      expect(message).toContain('Has headers.');
     });
   });
 });

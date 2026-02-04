@@ -82,11 +82,27 @@ export interface MarkdownToDocOptions {
 }
 
 /**
+ * Table information for two-pass insertion
+ */
+export interface TableInsertionInfo {
+  /** Approximate index where table was inserted (for finding it later) */
+  approximateIndex: number;
+  /** Number of rows */
+  rows: number;
+  /** Number of columns */
+  columns: number;
+  /** Cell content [row][col] */
+  cellContent: string[][];
+}
+
+/**
  * Result of Markdown → Doc conversion
  */
 export interface MarkdownToDocResult {
   /** Google Docs API requests to apply */
   requests: Request[];
+  /** Tables that need content populated in a second pass */
+  tables: TableInsertionInfo[];
 }
 
 /**

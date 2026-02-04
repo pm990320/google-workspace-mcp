@@ -1,7 +1,6 @@
 // tests/markdown/DocToMarkdown.test.js
 import { DocToMarkdown } from '../../dist/markdown/DocToMarkdown.js';
-import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, expect } from 'vitest';
 
 describe('DocToMarkdown', () => {
   let converter;
@@ -25,7 +24,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'Hello, world!');
+      expect(result.markdown).toBe('Hello, world!');
     });
 
     it('should convert multiple paragraphs', () => {
@@ -47,19 +46,19 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'First paragraph.\n\nSecond paragraph.');
+      expect(result.markdown).toBe('First paragraph.\n\nSecond paragraph.');
     });
 
     it('should handle empty document', () => {
       const doc = { body: { content: [] } };
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '');
+      expect(result.markdown).toBe('');
     });
 
     it('should handle document with no body', () => {
       const doc = {};
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '');
+      expect(result.markdown).toBe('');
     });
   });
 
@@ -79,7 +78,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '# My Heading');
+      expect(result.markdown).toBe('# My Heading');
     });
 
     it('should convert HEADING_2 to ## heading', () => {
@@ -97,7 +96,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '## Subheading');
+      expect(result.markdown).toBe('## Subheading');
     });
 
     it('should convert TITLE to # heading', () => {
@@ -115,7 +114,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '# Document Title');
+      expect(result.markdown).toBe('# Document Title');
     });
 
     it('should convert SUBTITLE to ## heading', () => {
@@ -133,7 +132,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '## Document Subtitle');
+      expect(result.markdown).toBe('## Document Subtitle');
     });
 
     it('should handle all heading levels (1-6)', () => {
@@ -157,7 +156,7 @@ describe('DocToMarkdown', () => {
         '##### Heading 5',
         '###### Heading 6',
       ].join('\n\n');
-      assert.strictEqual(result.markdown, expected);
+      expect(result.markdown).toBe(expected);
     });
   });
 
@@ -180,7 +179,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'This is **bold** text.');
+      expect(result.markdown).toBe('This is **bold** text.');
     });
 
     it('should convert italic text', () => {
@@ -201,7 +200,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'This is *italic* text.');
+      expect(result.markdown).toBe('This is *italic* text.');
     });
 
     it('should convert strikethrough text', () => {
@@ -222,7 +221,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'This is ~~deleted~~ text.');
+      expect(result.markdown).toBe('This is ~~deleted~~ text.');
     });
 
     it('should convert links', () => {
@@ -248,7 +247,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'Visit [Google](https://google.com) for more.');
+      expect(result.markdown).toBe('Visit [Google](https://google.com) for more.');
     });
 
     it('should convert bold and italic combined', () => {
@@ -273,7 +272,7 @@ describe('DocToMarkdown', () => {
 
       const result = converter.convert(doc);
       // Bold is applied first, then italic wraps it
-      assert.strictEqual(result.markdown, '***bold and italic***');
+      expect(result.markdown).toBe('***bold and italic***');
     });
 
     it('should convert monospace font to inline code', () => {
@@ -299,7 +298,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'Run `npm install` to install.');
+      expect(result.markdown).toBe('Run `npm install` to install.');
     });
   });
 
@@ -325,7 +324,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '- First item\n- Second item');
+      expect(result.markdown).toBe('- First item\n- Second item');
     });
 
     it('should handle nested bullet lists', () => {
@@ -349,7 +348,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '- Parent item\n  - Child item');
+      expect(result.markdown).toBe('- Parent item\n  - Child item');
     });
   });
 
@@ -386,7 +385,7 @@ describe('DocToMarkdown', () => {
 
       const result = converter.convert(doc);
       const expected = '| Name | Age |\n|---|---|\n| Alice | 30 |';
-      assert.strictEqual(result.markdown, expected);
+      expect(result.markdown).toBe(expected);
     });
 
     it('should handle empty table cells', () => {
@@ -410,7 +409,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.ok(result.markdown.includes('| A |'));
+      expect(result.markdown).toContain('| A |');
     });
   });
 
@@ -446,7 +445,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '![A nice picture](https://example.com/image.png)');
+      expect(result.markdown).toBe('![A nice picture](https://example.com/image.png)');
     });
 
     it('should use title when description is missing', () => {
@@ -475,7 +474,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, '![Screenshot](https://example.com/screenshot.png)');
+      expect(result.markdown).toBe('![Screenshot](https://example.com/screenshot.png)');
     });
 
     it('should handle missing inline object gracefully', () => {
@@ -498,7 +497,7 @@ describe('DocToMarkdown', () => {
 
       const result = converter.convert(doc);
       // Double space is expected since the original text runs have surrounding spaces
-      assert.strictEqual(result.markdown, 'Before  after');
+      expect(result.markdown).toBe('Before  after');
     });
   });
 
@@ -523,7 +522,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'Section 1\n\n---\n\nSection 2');
+      expect(result.markdown).toBe('Section 1\n\n---\n\nSection 2');
     });
   });
 
@@ -552,7 +551,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.ok(result.markdown.includes('---'));
+      expect(result.markdown).toContain('---');
     });
   });
 
@@ -576,8 +575,8 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc, { includeLineNumbers: true });
-      assert.ok(result.markdown.includes('1\t'));
-      assert.ok(result.markdown.includes('Line one'));
+      expect(result.markdown).toContain('1\t');
+      expect(result.markdown).toContain('Line one');
     });
   });
 
@@ -600,7 +599,7 @@ describe('DocToMarkdown', () => {
       };
 
       const result = converter.convert(doc);
-      assert.strictEqual(result.markdown, 'Hello **world** today!');
+      expect(result.markdown).toBe('Hello **world** today!');
     });
 
     it('should collapse excessive newlines', () => {
@@ -626,7 +625,7 @@ describe('DocToMarkdown', () => {
 
       const result = converter.convert(doc);
       // Should not have more than 2 consecutive newlines
-      assert.ok(!result.markdown.includes('\n\n\n'));
+      expect(result.markdown).not.toContain('\n\n\n');
     });
   });
 });

@@ -8,10 +8,112 @@
 
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
+import { type docs_v1 } from 'googleapis';
 import { type DocsToolOptions, AccountDocumentParameters } from '../types.js';
 import { CompatibilityChecker, DocToMarkdown, MarkdownToDoc } from '../markdown/index.js';
+import { type TableInsertionInfo, type Request } from '../markdown/types.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { getDocsUrl } from '../urlHelpers.js';
+
+/**
+ * Helper to populate table cells after tables have been created
+ * This is the second pass of the two-pass table insertion approach
+ */
+function populateTableCells(
+  document: docs_v1.Schema$Document,
+  tables: TableInsertionInfo[],
+  log: { info: (msg: string) => void }
+): Request[] {
+  const requests: Request[] = [];
+  const body = document.body;
+
+  if (!body?.content) {
+    return requests;
+  }
+
+  // Find all tables in the document
+  const docTables: Array<{
+    startIndex: number;
+    rows: docs_v1.Schema$TableRow[];
+  }> = [];
+
+  for (const element of body.content) {
+    if (element.table && typeof element.startIndex === 'number') {
+      docTables.push({
+        startIndex: element.startIndex,
+        rows: element.table.tableRows || [],
+      });
+    }
+  }
+
+  log.info(`Found ${docTables.length} table(s) in document`);
+
+  // Match tables by order (since we insert in order, they should align)
+  // For each table we need to populate, find the corresponding doc table
+  for (let tableIdx = 0; tableIdx < tables.length; tableIdx++) {
+    const tableInfo = tables[tableIdx];
+
+    if (tableIdx >= docTables.length) {
+      log.info(`Warning: Could not find table ${tableIdx + 1} in document`);
+      continue;
+    }
+
+    const docTable = docTables[tableIdx];
+
+    // Populate each cell - we need to insert in REVERSE order
+    // because insertions shift subsequent indices
+    const cellInserts: Array<{
+      index: number;
+      text: string;
+    }> = [];
+
+    for (let rowIdx = 0; rowIdx < tableInfo.rows; rowIdx++) {
+      if (rowIdx >= docTable.rows.length) continue;
+
+      const docRow = docTable.rows[rowIdx];
+      const cells = docRow.tableCells || [];
+
+      for (let colIdx = 0; colIdx < tableInfo.columns; colIdx++) {
+        if (colIdx >= cells.length) continue;
+
+        const docCell = cells[colIdx];
+        const cellContent = tableInfo.cellContent[rowIdx]?.[colIdx] || '';
+
+        // Skip empty cells
+        if (!cellContent.trim()) continue;
+
+        // Find the cell's content start index
+        // Each cell has content array with paragraph(s)
+        if (docCell.content && docCell.content.length > 0) {
+          const firstParagraph = docCell.content[0];
+          const cellStartIndex = firstParagraph.startIndex;
+
+          if (typeof cellStartIndex === 'number') {
+            cellInserts.push({
+              index: cellStartIndex,
+              text: cellContent,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by index descending so we insert from end to beginning
+    // This way indices don't shift for earlier insertions
+    cellInserts.sort((a, b) => b.index - a.index);
+
+    for (const insert of cellInserts) {
+      requests.push({
+        insertText: {
+          location: { index: insert.index },
+          text: insert.text,
+        },
+      });
+    }
+  }
+
+  return requests;
+}
 
 export function registerMarkdownDocsTools(options: DocsToolOptions) {
   const { server, getDocsClient, getAccountEmail } = options;
@@ -182,7 +284,7 @@ This tool takes Markdown content and replaces the entire document content with t
 
         log.info(`Generated ${result.requests.length} API requests`);
 
-        // Execute the batch update
+        // Execute the batch update (first pass - creates structure including empty tables)
         if (result.requests.length > 0) {
           await docs.documents.batchUpdate({
             documentId: args.documentId,
@@ -192,12 +294,40 @@ This tool takes Markdown content and replaces the entire document content with t
           });
         }
 
+        // Second pass: populate table cells if any tables were inserted
+        let tableRequestCount = 0;
+        if (result.tables.length > 0) {
+          log.info(`Populating ${result.tables.length} table(s) with content`);
+
+          // Re-fetch the document to get actual table cell indices
+          const updatedDoc = await docs.documents.get({
+            documentId: args.documentId,
+          });
+
+          const tablePopulateRequests = populateTableCells(updatedDoc.data, result.tables, log);
+
+          if (tablePopulateRequests.length > 0) {
+            await docs.documents.batchUpdate({
+              documentId: args.documentId,
+              requestBody: {
+                requests: tablePopulateRequests,
+              },
+            });
+            tableRequestCount = tablePopulateRequests.length;
+          }
+        }
+
         const docLink = getDocsUrl(args.documentId, email);
 
         let output = `Successfully updated document "${document.title}".\n\n`;
         output += `Document ID: ${args.documentId}\n`;
         output += `View/Edit: ${docLink}\n\n`;
-        output += `Applied ${result.requests.length} changes.\n\n`;
+        const totalRequests = result.requests.length + tableRequestCount;
+        output += `Applied ${totalRequests} changes`;
+        if (result.tables.length > 0) {
+          output += ` (including ${result.tables.length} table(s))`;
+        }
+        output += '.\n\n';
         output += 'Note: Review the document in Google Docs to verify the formatting is correct.';
 
         return output;

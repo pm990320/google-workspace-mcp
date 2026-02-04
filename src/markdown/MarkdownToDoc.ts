@@ -9,6 +9,7 @@ import {
   type Request,
   type MarkdownToDocOptions,
   type MarkdownToDocResult,
+  type TableInsertionInfo,
   MarkdownElementType,
   type MarkdownElement,
   type InlineFormat,
@@ -43,6 +44,7 @@ export class MarkdownToDoc {
     documentEndIndex = 1
   ): MarkdownToDocResult {
     const requests: Request[] = [];
+    const tables: TableInsertionInfo[] = [];
 
     // For full replacement, first delete existing content
     if (options.fullReplace && documentEndIndex > 1) {
@@ -74,6 +76,12 @@ export class MarkdownToDoc {
       }
       formattingRequests.push(...result.formattingRequests);
       paragraphStyleRequests.push(...result.paragraphStyleRequests);
+
+      // Track table info for second pass population
+      if (result.tableInfo) {
+        tables.push(result.tableInfo);
+      }
+
       currentIndex += result.textLength;
     }
 
@@ -83,7 +91,7 @@ export class MarkdownToDoc {
     // Apply text formatting after paragraph styles
     requests.push(...formattingRequests);
 
-    return { requests };
+    return { requests, tables };
   }
 
   /**
@@ -235,6 +243,7 @@ export class MarkdownToDoc {
     formattingRequests: Request[];
     paragraphStyleRequests: Request[];
     textLength: number;
+    tableInfo?: TableInsertionInfo;
   } {
     const formattingRequests: Request[] = [];
     const paragraphStyleRequests: Request[] = [];
@@ -342,11 +351,40 @@ export class MarkdownToDoc {
       }
 
       case MarkdownElementType.HORIZONTAL_RULE: {
+        // Insert a visual horizontal line using Unicode box-drawing character
+        // This creates a visible divider that renders well in Google Docs
+        const hrText = '─'.repeat(50) + '\n';
+
+        // Center the horizontal rule and make it light gray
+        paragraphStyleRequests.push({
+          updateParagraphStyle: {
+            range: { startIndex, endIndex: startIndex + hrText.length },
+            paragraphStyle: {
+              alignment: 'CENTER',
+            },
+            fields: 'alignment',
+          },
+        });
+
+        formattingRequests.push({
+          updateTextStyle: {
+            range: { startIndex, endIndex: startIndex + hrText.length - 1 },
+            textStyle: {
+              foregroundColor: {
+                color: {
+                  rgbColor: { red: 0.6, green: 0.6, blue: 0.6 },
+                },
+              },
+            },
+            fields: 'foregroundColor',
+          },
+        });
+
         return {
-          insertRequest: { insertText: { location: { index: startIndex }, text: '\n' } },
-          formattingRequests: [],
-          paragraphStyleRequests: [],
-          textLength: 1,
+          insertRequest: { insertText: { location: { index: startIndex }, text: hrText } },
+          formattingRequests,
+          paragraphStyleRequests,
+          textLength: hrText.length,
         };
       }
 
@@ -400,21 +438,26 @@ export class MarkdownToDoc {
           },
         };
 
-        // Note: Table cell content would need to be inserted separately
-        // after the table is created. This is complex because we need
-        // to know the cell indices after table creation.
-        // For now, we create an empty table.
-        // Full table content support would require a two-pass approach.
+        // Calculate accurate table length:
+        // - 1 for table element overhead
+        // - Each cell has a paragraph with a newline = 2 indices per cell
+        // After table creation, each cell contains exactly 1 paragraph with 1 newline
+        const tableLength = 1 + rows * cols * 2;
 
-        // Approximate table size (very rough estimate)
-        // Tables are complex - each cell has its own content
-        const estimatedLength = rows * cols * 2 + rows + 1;
+        // Track table info for second pass cell population
+        const tableInfo: TableInsertionInfo = {
+          approximateIndex: startIndex,
+          rows,
+          columns: cols,
+          cellContent: element.tableRows,
+        };
 
         return {
           insertRequest: insertTableRequest,
           formattingRequests: [],
           paragraphStyleRequests: [],
-          textLength: estimatedLength,
+          textLength: tableLength,
+          tableInfo,
         };
       }
 

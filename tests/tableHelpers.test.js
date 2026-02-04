@@ -4,8 +4,7 @@ import {
   findTableCellRange,
   editTableCellContent,
 } from '../dist/googleDocsApiHelpers.js';
-import assert from 'node:assert';
-import { describe, it, mock } from 'node:test';
+import { describe, it, expect, vi } from 'vitest';
 
 // Helper to create a mock table structure
 function createMockTable(startIndex, rows, columns) {
@@ -47,7 +46,7 @@ describe('Table Helper Functions', () => {
     it('should find tables in a document and return their metadata', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -68,16 +67,16 @@ describe('Table Helper Functions', () => {
 
       const result = await findDocumentTables(mockDocs, 'doc123');
 
-      assert.strictEqual(result.length, 1);
-      assert.strictEqual(result[0].startIndex, 10);
-      assert.strictEqual(result[0].rows, 2);
-      assert.strictEqual(result[0].columns, 3);
+      expect(result.length).toBe(1);
+      expect(result[0].startIndex).toBe(10);
+      expect(result[0].rows).toBe(2);
+      expect(result[0].columns).toBe(3);
     });
 
     it('should find multiple tables in a document', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -101,17 +100,17 @@ describe('Table Helper Functions', () => {
 
       const result = await findDocumentTables(mockDocs, 'doc123');
 
-      assert.strictEqual(result.length, 2);
-      assert.strictEqual(result[0].rows, 2);
-      assert.strictEqual(result[0].columns, 2);
-      assert.strictEqual(result[1].rows, 3);
-      assert.strictEqual(result[1].columns, 4);
+      expect(result.length).toBe(2);
+      expect(result[0].rows).toBe(2);
+      expect(result[0].columns).toBe(2);
+      expect(result[1].rows).toBe(3);
+      expect(result[1].columns).toBe(4);
     });
 
     it('should return empty array when document has no tables', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -133,13 +132,13 @@ describe('Table Helper Functions', () => {
 
       const result = await findDocumentTables(mockDocs, 'doc123');
 
-      assert.strictEqual(result.length, 0);
+      expect(result.length).toBe(0);
     });
 
     it('should return empty array when document body has no content', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {},
             },
@@ -149,7 +148,7 @@ describe('Table Helper Functions', () => {
 
       const result = await findDocumentTables(mockDocs, 'doc123');
 
-      assert.strictEqual(result.length, 0);
+      expect(result.length).toBe(0);
     });
   });
 
@@ -157,7 +156,7 @@ describe('Table Helper Functions', () => {
     it('should find the cell range for a valid row and column', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -207,13 +206,13 @@ describe('Table Helper Functions', () => {
       // Get cell at row 1, column 1 (second row, second column - 0-indexed)
       const result = await findTableCellRange(mockDocs, 'doc123', 1, 1, 1);
 
-      assert.deepStrictEqual(result, { startIndex: 20, endIndex: 25 });
+      expect(result).toEqual({ startIndex: 20, endIndex: 25 });
     });
 
     it('should throw UserError for out-of-bounds row index', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -235,16 +234,15 @@ describe('Table Helper Functions', () => {
         },
       };
 
-      await assert.rejects(async () => await findTableCellRange(mockDocs, 'doc123', 1, 5, 0), {
-        name: 'UserError',
-        message: /Row index 5 out of bounds/,
-      });
+      await expect(findTableCellRange(mockDocs, 'doc123', 1, 5, 0)).rejects.toThrow(
+        /Row index 5 out of bounds/
+      );
     });
 
     it('should throw UserError for out-of-bounds column index', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -266,16 +264,15 @@ describe('Table Helper Functions', () => {
         },
       };
 
-      await assert.rejects(async () => await findTableCellRange(mockDocs, 'doc123', 1, 0, 5), {
-        name: 'UserError',
-        message: /Column index 5 out of bounds/,
-      });
+      await expect(findTableCellRange(mockDocs, 'doc123', 1, 0, 5)).rejects.toThrow(
+        /Column index 5 out of bounds/
+      );
     });
 
     it('should throw UserError when no table found at specified index', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -291,10 +288,9 @@ describe('Table Helper Functions', () => {
         },
       };
 
-      await assert.rejects(async () => await findTableCellRange(mockDocs, 'doc123', 100, 0, 0), {
-        name: 'UserError',
-        message: /No table found at index 100/,
-      });
+      await expect(findTableCellRange(mockDocs, 'doc123', 100, 0, 0)).rejects.toThrow(
+        /No table found at index 100/
+      );
     });
   });
 
@@ -304,7 +300,7 @@ describe('Table Helper Functions', () => {
 
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -329,7 +325,7 @@ describe('Table Helper Functions', () => {
               },
             },
           })),
-          batchUpdate: mock.fn(async (params) => {
+          batchUpdate: vi.fn(async (params) => {
             capturedRequests = params.requestBody.requests;
             return { data: { documentId: 'doc123' } };
           }),
@@ -339,17 +335,17 @@ describe('Table Helper Functions', () => {
       await editTableCellContent(mockDocs, 'doc123', 1, 0, 0, 'New content');
 
       // Should have 2 requests: delete existing content, then insert new
-      assert.strictEqual(capturedRequests.length, 2);
+      expect(capturedRequests.length).toBe(2);
 
       // First request should be deleteContentRange (from startIndex to endIndex-1)
-      assert.ok(capturedRequests[0].deleteContentRange);
-      assert.strictEqual(capturedRequests[0].deleteContentRange.range.startIndex, 5);
-      assert.strictEqual(capturedRequests[0].deleteContentRange.range.endIndex, 14); // 15-1
+      expect(capturedRequests[0].deleteContentRange).toBeTruthy();
+      expect(capturedRequests[0].deleteContentRange.range.startIndex).toBe(5);
+      expect(capturedRequests[0].deleteContentRange.range.endIndex).toBe(14); // 15-1
 
       // Second request should be insertText
-      assert.ok(capturedRequests[1].insertText);
-      assert.strictEqual(capturedRequests[1].insertText.location.index, 5);
-      assert.strictEqual(capturedRequests[1].insertText.text, 'New content');
+      expect(capturedRequests[1].insertText).toBeTruthy();
+      expect(capturedRequests[1].insertText.location.index).toBe(5);
+      expect(capturedRequests[1].insertText.text).toBe('New content');
     });
 
     it('should only insert when cell is empty (no content to delete)', async () => {
@@ -357,7 +353,7 @@ describe('Table Helper Functions', () => {
 
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -382,7 +378,7 @@ describe('Table Helper Functions', () => {
               },
             },
           })),
-          batchUpdate: mock.fn(async (params) => {
+          batchUpdate: vi.fn(async (params) => {
             capturedRequests = params.requestBody.requests;
             return { data: { documentId: 'doc123' } };
           }),
@@ -392,15 +388,15 @@ describe('Table Helper Functions', () => {
       await editTableCellContent(mockDocs, 'doc123', 1, 0, 0, 'Content');
 
       // Should only have insert request (no delete since cell was empty - startIndex 5, endIndex 6, delete would be 5 to 5)
-      assert.strictEqual(capturedRequests.length, 1);
-      assert.ok(capturedRequests[0].insertText);
-      assert.strictEqual(capturedRequests[0].insertText.text, 'Content');
+      expect(capturedRequests.length).toBe(1);
+      expect(capturedRequests[0].insertText).toBeTruthy();
+      expect(capturedRequests[0].insertText.text).toBe('Content');
     });
 
     it('should return empty response when new content is empty and cell has only newline', async () => {
       const mockDocs = {
         documents: {
-          get: mock.fn(async () => ({
+          get: vi.fn(async () => ({
             data: {
               body: {
                 content: [
@@ -425,7 +421,7 @@ describe('Table Helper Functions', () => {
               },
             },
           })),
-          batchUpdate: mock.fn(async () => {
+          batchUpdate: vi.fn(async () => {
             return { data: { documentId: 'doc123' } };
           }),
         },
@@ -434,7 +430,7 @@ describe('Table Helper Functions', () => {
       const result = await editTableCellContent(mockDocs, 'doc123', 1, 0, 0, '');
 
       // With empty content and nothing to delete, should return empty object
-      assert.deepStrictEqual(result, {});
+      expect(result).toEqual({});
     });
   });
 });
