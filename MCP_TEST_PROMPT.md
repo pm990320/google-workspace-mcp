@@ -159,35 +159,45 @@ First, list available accounts and use one for all subsequent tests. Store the a
 **Attachment Operations:**
 9. **Read a message with attachments** (find one using `searchGmail` with `has:attachment`)
 10. **Get attachment metadata** from `readGmailMessage` (note the attachmentId)
-11. **Download an attachment** using `getGmailAttachment`
+11. **Get attachment preview** using `getGmailAttachment` (returns truncated base64 data)
+12. **Download full attachment** using `downloadGmailAttachment` (returns complete base64 data)
+13. **Download attachment to file** using `downloadGmailAttachment` with `savePath` parameter (save to a temp file, verify it was created, then delete)
 
 **Draft Operations:**
-12. **Create a draft email** addressed to a test address with test subject and body
-13. **List all drafts** to verify your draft appears
-14. **Read the draft** to verify its content
-15. **Update the draft** - change the subject line
-16. **Add an attachment to the draft** using `addAttachmentToDraft` (use a small base64 text file)
-17. **Read the draft again** to verify the attachment was added
-18. **Remove the attachment from the draft** using `removeAttachmentFromDraft`
-19. **Add a star label** to the draft's message using `addGmailLabel`
-20. **Remove the star label** from the message using `removeGmailLabel`
-21. **Send the draft** to actually send it (will go to the test address)
+14. **Create a draft email** addressed to a test address with test subject and body
+15. **List all drafts** to verify your draft appears
+16. **Read the draft** to verify its content
+17. **Update the draft** - change the subject line
+18. **Add an attachment to the draft** using `addAttachmentToDraft` (use a small base64 text file)
+19. **Read the draft again** to verify the attachment was added
+20. **Remove the attachment from the draft** using `removeAttachmentFromDraft`
+21. **Add a star label** to the draft's message using `addGmailLabel`
+22. **Remove the star label** from the message using `removeGmailLabel`
+23. **Send the draft** to actually send it (will go to the test address)
 
 **Batch Operations:**
-22. **Search for multiple messages** to get several message IDs
-23. **Batch add labels** to multiple messages using `batchAddGmailLabels`
-24. **Batch remove labels** from multiple messages using `batchRemoveGmailLabels`
+24. **Search for multiple messages** to get several message IDs
+25. **Batch add labels** to multiple messages using `batchAddGmailLabels`
+26. **Batch remove labels** from multiple messages using `batchRemoveGmailLabels`
+
+**Label Management:**
+27. **Create a test label** using `createGmailLabel` with name "MCP-Test-Label"
+28. **List labels** to verify the new label was created
+29. **Apply the label** to a message using `addGmailLabel` with the new label ID
+30. **Remove the label** from the message using `removeGmailLabel`
 
 **Filter Management:**
-25. **List all Gmail filters** using `listGmailFilters`
-26. **Create a test filter** using `createGmailFilter` (e.g., from:test@example.com → add label)
-27. **List filters again** to verify the filter was created
-28. **Delete the test filter** using `deleteGmailFilter`
+31. **List all Gmail filters** using `listGmailFilters`
+32. **Create a test filter** using `createGmailFilter` (e.g., from:test@example.com → add label)
+33. **List filters again** to verify the filter was created
+34. **Delete the test filter** using `deleteGmailFilter`
 
 **Cleanup:**
-29. **Create another draft** for cleanup testing
-30. **Delete the draft** (permanent deletion)
-31. **Delete the sent message** (moves to trash)
+35. **Create another draft** for cleanup testing
+36. **Delete the draft** (permanent deletion)
+37. **Delete the sent message** (moves to trash)
+
+Note: Test labels created during testing should be manually deleted in Gmail settings if desired.
 
 ---
 
@@ -262,11 +272,11 @@ The following tools have known limitations and are excluded:
 | 1 | Docs | 29 |
 | 2 | Drive | 10 |
 | 3 | Sheets | 10 |
-| 4 | Gmail | 31 |
+| 4 | Gmail | 37 |
 | 5 | Calendar | 7 |
 | 6 | Slides | 7 |
 | 7 | Forms | 9 |
-| **Total** | | **~104** |
+| **Total** | | **~110** |
 
 ---
 

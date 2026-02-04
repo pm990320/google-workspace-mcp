@@ -1,4 +1,6 @@
 // gmail.tools.ts - Gmail tool module
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { z } from 'zod';
 import { formatToolError } from '../errorHelpers.js';
 import { type GmailToolOptions, type MessagePart } from '../types.js';
@@ -337,6 +339,92 @@ export function registerGmailTools(options: GmailToolOptions) {
         return result;
       } catch (error: unknown) {
         throw new Error(formatToolError('listGmailLabels', error));
+      }
+    },
+  });
+
+  // --- Create Gmail Label ---
+  server.addTool({
+    name: 'createGmailLabel',
+    description:
+      'Create a new Gmail label (folder). Labels can be used to organize emails. After creating a label, use addGmailLabel to apply it to messages.',
+    annotations: {
+      title: 'Create Gmail Label',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      name: z
+        .string()
+        .describe(
+          'Name of the label to create. Use "/" for nested labels (e.g., "Work/Projects")'
+        ),
+      labelListVisibility: z
+        .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
+        .optional()
+        .default('labelShow')
+        .describe(
+          'Whether to show the label in the label list: labelShow (always), labelShowIfUnread (only when unread), labelHide (hidden)'
+        ),
+      messageListVisibility: z
+        .enum(['show', 'hide'])
+        .optional()
+        .default('show')
+        .describe('Whether to show the label in the message list'),
+      backgroundColor: z
+        .string()
+        .optional()
+        .describe('Background color in hex format (e.g., "#16a765")'),
+      textColor: z
+        .string()
+        .optional()
+        .describe('Text color in hex format (e.g., "#ffffff")'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const labelColor =
+          args.backgroundColor || args.textColor
+            ? {
+                backgroundColor: args.backgroundColor,
+                textColor: args.textColor,
+              }
+            : undefined;
+
+        const response = await gmail.users.labels.create({
+          userId: 'me',
+          requestBody: {
+            name: args.name,
+            labelListVisibility: args.labelListVisibility,
+            messageListVisibility: args.messageListVisibility,
+            color: labelColor,
+          },
+        });
+
+        const label = response.data;
+
+        let result = `Successfully created label "${args.name}".\n\n`;
+        result += `Label ID: ${label.id}\n`;
+        result += `Name: ${label.name}\n`;
+        result += `Type: ${label.type}\n`;
+        if (label.labelListVisibility) {
+          result += `Label List Visibility: ${label.labelListVisibility}\n`;
+        }
+        if (label.messageListVisibility) {
+          result += `Message List Visibility: ${label.messageListVisibility}\n`;
+        }
+        if (label.color) {
+          result += `Color: ${label.color.backgroundColor || 'default'} / ${label.color.textColor || 'default'}\n`;
+        }
+        result += `\nUse this Label ID with addGmailLabel to apply it to messages.`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('createGmailLabel', error));
       }
     },
   });
@@ -1394,7 +1482,7 @@ export function registerGmailTools(options: GmailToolOptions) {
   server.addTool({
     name: 'getGmailAttachment',
     description:
-      'Download an attachment from a Gmail message. Returns the attachment as base64-encoded data along with metadata.',
+      'Get metadata and a preview of a Gmail attachment. Returns truncated base64 data (first 500 chars). For full attachment data or saving to file, use downloadGmailAttachment instead.',
     annotations: {
       title: 'Get Gmail Attachment',
       readOnlyHint: true,
@@ -1430,6 +1518,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           result += `**Base64 Data (first 500 chars):**\n${attachment.data.substring(0, 500)}${attachment.data.length > 500 ? '...' : ''}\n\n`;
           result += `**Full data length:** ${attachment.data.length} characters\n`;
           result += `\nNote: Data is base64url encoded. To decode, replace - with + and _ with /, then base64 decode.`;
+          result += `\n\nTip: Use downloadGmailAttachment to get full data or save directly to a file.`;
         } else {
           result += 'No attachment data available.';
         }
@@ -1437,6 +1526,117 @@ export function registerGmailTools(options: GmailToolOptions) {
         return result;
       } catch (error: unknown) {
         throw new Error(formatToolError('getGmailAttachment', error));
+      }
+    },
+  });
+
+  // --- Download Gmail Attachment ---
+  server.addTool({
+    name: 'downloadGmailAttachment',
+    description:
+      'Download a Gmail attachment with full data. Returns complete base64-encoded data, or saves directly to a file if savePath is provided. Use this instead of getGmailAttachment when you need the full attachment content.',
+    annotations: {
+      title: 'Download Gmail Attachment',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The ID of the message containing the attachment'),
+      attachmentId: z
+        .string()
+        .describe('The attachment ID (from readGmailMessage attachment info)'),
+      savePath: z
+        .string()
+        .optional()
+        .describe(
+          'Optional file path to save the attachment to. If provided, the decoded attachment is written to this path. The path must be absolute.'
+        ),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        // First, get attachment metadata from the message to find the filename
+        const messageResponse = await gmail.users.messages.get({
+          userId: 'me',
+          id: args.messageId,
+          format: 'full',
+        });
+
+        // Find attachment info in message parts
+        let attachmentFilename = 'attachment';
+        let attachmentMimeType = 'application/octet-stream';
+
+        const findAttachmentInfo = (part: MessagePart) => {
+          if (part.body?.attachmentId === args.attachmentId && part.filename) {
+            attachmentFilename = part.filename;
+            attachmentMimeType = part.mimeType || 'application/octet-stream';
+            return true;
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (findAttachmentInfo(subpart)) return true;
+            }
+          }
+          return false;
+        };
+
+        if (messageResponse.data.payload) {
+          findAttachmentInfo(messageResponse.data.payload);
+        }
+
+        // Get the attachment data
+        const response = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId: args.messageId,
+          id: args.attachmentId,
+        });
+
+        const attachment = response.data;
+        const size = attachment.size || 0;
+
+        if (!attachment.data) {
+          throw new Error('No attachment data available');
+        }
+
+        // Convert base64url to standard base64
+        const base64Data = attachment.data.replace(/-/g, '+').replace(/_/g, '/');
+
+        let result = '**Attachment Downloaded**\n\n';
+        result += `Filename: ${attachmentFilename}\n`;
+        result += `MIME Type: ${attachmentMimeType}\n`;
+        result += `Size: ${size} bytes (${(size / 1024).toFixed(2)} KB)\n`;
+        result += `Message ID: ${args.messageId}\n`;
+        result += `Attachment ID: ${args.attachmentId}\n\n`;
+
+        if (args.savePath) {
+          // Validate that savePath is absolute
+          if (!path.isAbsolute(args.savePath)) {
+            throw new Error(
+              `savePath must be an absolute path. Received: ${args.savePath}`
+            );
+          }
+
+          // Decode and save to file
+          const buffer = Buffer.from(base64Data, 'base64');
+
+          // Ensure parent directory exists
+          const parentDir = path.dirname(args.savePath);
+          await fs.mkdir(parentDir, { recursive: true });
+
+          await fs.writeFile(args.savePath, buffer);
+
+          result += `**Saved to:** ${args.savePath}\n`;
+          result += `File size on disk: ${buffer.length} bytes`;
+        } else {
+          // Return full base64 data
+          result += `**Base64 Data (standard encoding):**\n${base64Data}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('downloadGmailAttachment', error));
       }
     },
   });

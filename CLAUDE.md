@@ -37,9 +37,9 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Formatting | 3 | `applyTextStyle`, `applyParagraphStyle`, `formatMatchingText` |
 | Structure | 7 | `insertTable`, `insertPageBreak`, `insertImageFromUrl`, `insertLocalImage`, `editTableCell`, `findElement`, `fixListFormatting`* |
 | Comments | 6 | `listComments`, `getComment`, `addComment`, `replyToComment`, `resolveComment`, `deleteComment` |
-| Sheets | 8 | `readSpreadsheet`, `writeSpreadsheet`, `appendSpreadsheetRows`, `clearSpreadsheetRange`, `createSpreadsheet`, `listGoogleSheets` |
+| Sheets | 9 | `readSpreadsheet`, `writeSpreadsheet`, `appendSpreadsheetRows`, `clearSpreadsheetRange`, `createSpreadsheet`, `listGoogleSheets`, `downloadSpreadsheet` |
 | Drive | 13 | `listGoogleDocs`, `searchGoogleDocs`, `getDocumentInfo`, `createFolder`, `moveFile`, `copyFile`, `createDocument` |
-| Gmail | 25 | `listGmailMessages`, `readGmailMessage`, `searchGmail`, `getGmailAttachment`, `markAsRead`, `markAsUnread`, `listGmailThreads`, `readGmailThread`, `listGmailLabels`, `addGmailLabel`, `removeGmailLabel`, `batchAddGmailLabels`, `batchRemoveGmailLabels`, `createGmailDraft`, `listGmailDrafts`, `readGmailDraft`, `updateGmailDraft`, `addAttachmentToDraft`, `removeAttachmentFromDraft`, `sendGmailDraft`, `deleteGmailDraft`, `deleteGmailMessage`, `listGmailFilters`, `createGmailFilter`, `deleteGmailFilter` |
+| Gmail | 27 | `listGmailMessages`, `readGmailMessage`, `searchGmail`, `getGmailAttachment`, `downloadGmailAttachment`, `markAsRead`, `markAsUnread`, `listGmailThreads`, `readGmailThread`, `listGmailLabels`, `createGmailLabel`, `addGmailLabel`, `removeGmailLabel`, `batchAddGmailLabels`, `batchRemoveGmailLabels`, `createGmailDraft`, `listGmailDrafts`, `readGmailDraft`, `updateGmailDraft`, `addAttachmentToDraft`, `removeAttachmentFromDraft`, `sendGmailDraft`, `deleteGmailDraft`, `deleteGmailMessage`, `listGmailFilters`, `createGmailFilter`, `deleteGmailFilter` |
 | Calendar | 6 | `listCalendars`, `listCalendarEvents`, `getCalendarEvent`, `createCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent` |
 | Slides | 5 | `listPresentations`, `readPresentation`, `createPresentation`, `addSlide`, `addTextToSlide` |
 | Forms | 5 | `listForms`, `readForm`, `getFormResponses`, `createForm`, `addFormQuestion` |
@@ -73,6 +73,7 @@ The server requires these Google OAuth scopes:
 - `https://www.googleapis.com/auth/drive`
 - `https://www.googleapis.com/auth/spreadsheets`
 - `https://www.googleapis.com/auth/gmail.modify`
+- `https://www.googleapis.com/auth/gmail.settings.basic` (for filter management)
 - `https://www.googleapis.com/auth/calendar`
 - `https://www.googleapis.com/auth/presentations`
 - `https://www.googleapis.com/auth/forms.body`
