@@ -567,9 +567,7 @@ export function registerSheetsTools(options: SheetsToolOptions) {
           let sheetToExport = metadata.sheets?.[0];
 
           if (args.sheetName) {
-            sheetToExport = metadata.sheets?.find(
-              (s) => s.properties?.title === args.sheetName
-            );
+            sheetToExport = metadata.sheets?.find((s) => s.properties?.title === args.sheetName);
             if (!sheetToExport) {
               const availableSheets =
                 metadata.sheets?.map((s) => s.properties?.title).join(', ') || 'none';

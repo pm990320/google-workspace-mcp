@@ -359,9 +359,7 @@ export function registerGmailTools(options: GmailToolOptions) {
       account: z.string().describe('Account name to use'),
       name: z
         .string()
-        .describe(
-          'Name of the label to create. Use "/" for nested labels (e.g., "Work/Projects")'
-        ),
+        .describe('Name of the label to create. Use "/" for nested labels (e.g., "Work/Projects")'),
       labelListVisibility: z
         .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
         .optional()
@@ -378,10 +376,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         .string()
         .optional()
         .describe('Background color in hex format (e.g., "#16a765")'),
-      textColor: z
-        .string()
-        .optional()
-        .describe('Text color in hex format (e.g., "#ffffff")'),
+      textColor: z.string().optional().describe('Text color in hex format (e.g., "#ffffff")'),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -420,7 +415,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (label.color) {
           result += `Color: ${label.color.backgroundColor || 'default'} / ${label.color.textColor || 'default'}\n`;
         }
-        result += `\nUse this Label ID with addGmailLabel to apply it to messages.`;
+        result += '\nUse this Label ID with addGmailLabel to apply it to messages.';
 
         return result;
       } catch (error: unknown) {
@@ -619,15 +614,15 @@ export function registerGmailTools(options: GmailToolOptions) {
           emailContent += `Subject: ${args.subject}\r\n`;
           if (inReplyTo) emailContent += `In-Reply-To: ${inReplyTo}\r\n`;
           if (references) emailContent += `References: ${references}\r\n`;
-          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += 'MIME-Version: 1.0\r\n';
           emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
-          emailContent += `\r\n`;
+          emailContent += '\r\n';
 
           // Body part
           emailContent += `--${boundary}\r\n`;
           emailContent += `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
-          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
-          emailContent += `\r\n`;
+          emailContent += 'Content-Transfer-Encoding: 7bit\r\n';
+          emailContent += '\r\n';
           emailContent += `${args.body}\r\n`;
 
           // Attachment parts
@@ -635,12 +630,12 @@ export function registerGmailTools(options: GmailToolOptions) {
             emailContent += `--${boundary}\r\n`;
             emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
             emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
-            emailContent += `Content-Transfer-Encoding: base64\r\n`;
-            emailContent += `\r\n`;
+            emailContent += 'Content-Transfer-Encoding: base64\r\n';
+            emailContent += '\r\n';
             // Split base64 data into 76-character lines per RFC 2045
             const base64Lines = attachment.base64Data.match(/.{1,76}/g) || [];
             emailContent += base64Lines.join('\r\n');
-            emailContent += `\r\n`;
+            emailContent += '\r\n';
           }
 
           emailContent += `--${boundary}--\r\n`;
@@ -953,15 +948,15 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (newCc) emailContent += `Cc: ${newCc}\r\n`;
           if (newBcc) emailContent += `Bcc: ${newBcc}\r\n`;
           emailContent += `Subject: ${newSubject}\r\n`;
-          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += 'MIME-Version: 1.0\r\n';
           emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
-          emailContent += `\r\n`;
+          emailContent += '\r\n';
 
           // Body part
           emailContent += `--${boundary}\r\n`;
           emailContent += `Content-Type: ${isHtml ? 'text/html' : 'text/plain'}; charset=utf-8\r\n`;
-          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
-          emailContent += `\r\n`;
+          emailContent += 'Content-Transfer-Encoding: 7bit\r\n';
+          emailContent += '\r\n';
           emailContent += `${newBody}\r\n`;
 
           // Attachment parts
@@ -969,12 +964,12 @@ export function registerGmailTools(options: GmailToolOptions) {
             emailContent += `--${boundary}\r\n`;
             emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
             emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
-            emailContent += `Content-Transfer-Encoding: base64\r\n`;
-            emailContent += `\r\n`;
+            emailContent += 'Content-Transfer-Encoding: base64\r\n';
+            emailContent += '\r\n';
             // Split base64 data into 76-character lines per RFC 2045
             const base64Lines = attachment.base64Data.match(/.{1,76}/g) || [];
             emailContent += base64Lines.join('\r\n');
-            emailContent += `\r\n`;
+            emailContent += '\r\n';
           }
 
           emailContent += `--${boundary}--\r\n`;
@@ -1134,15 +1129,15 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (getCurrentHeader('Cc')) emailContent += `Cc: ${getCurrentHeader('Cc')}\r\n`;
         if (getCurrentHeader('Bcc')) emailContent += `Bcc: ${getCurrentHeader('Bcc')}\r\n`;
         emailContent += `Subject: ${getCurrentHeader('Subject')}\r\n`;
-        emailContent += `MIME-Version: 1.0\r\n`;
+        emailContent += 'MIME-Version: 1.0\r\n';
         emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
-        emailContent += `\r\n`;
+        emailContent += '\r\n';
 
         // Body part
         emailContent += `--${boundary}\r\n`;
         emailContent += `Content-Type: ${bodyMimeType}; charset=utf-8\r\n`;
-        emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
-        emailContent += `\r\n`;
+        emailContent += 'Content-Transfer-Encoding: 7bit\r\n';
+        emailContent += '\r\n';
         emailContent += `${bodyContent}\r\n`;
 
         // Attachment parts
@@ -1150,11 +1145,11 @@ export function registerGmailTools(options: GmailToolOptions) {
           emailContent += `--${boundary}\r\n`;
           emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
           emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
-          emailContent += `Content-Transfer-Encoding: base64\r\n`;
-          emailContent += `\r\n`;
+          emailContent += 'Content-Transfer-Encoding: base64\r\n';
+          emailContent += '\r\n';
           const base64Lines = attachment.data.match(/.{1,76}/g) || [];
           emailContent += base64Lines.join('\r\n');
-          emailContent += `\r\n`;
+          emailContent += '\r\n';
         }
 
         emailContent += `--${boundary}--\r\n`;
@@ -1299,15 +1294,15 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (getCurrentHeader('Cc')) emailContent += `Cc: ${getCurrentHeader('Cc')}\r\n`;
           if (getCurrentHeader('Bcc')) emailContent += `Bcc: ${getCurrentHeader('Bcc')}\r\n`;
           emailContent += `Subject: ${getCurrentHeader('Subject')}\r\n`;
-          emailContent += `MIME-Version: 1.0\r\n`;
+          emailContent += 'MIME-Version: 1.0\r\n';
           emailContent += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n`;
-          emailContent += `\r\n`;
+          emailContent += '\r\n';
 
           // Body part
           emailContent += `--${boundary}\r\n`;
           emailContent += `Content-Type: ${bodyMimeType}; charset=utf-8\r\n`;
-          emailContent += `Content-Transfer-Encoding: 7bit\r\n`;
-          emailContent += `\r\n`;
+          emailContent += 'Content-Transfer-Encoding: 7bit\r\n';
+          emailContent += '\r\n';
           emailContent += `${bodyContent}\r\n`;
 
           // Remaining attachment parts
@@ -1315,11 +1310,11 @@ export function registerGmailTools(options: GmailToolOptions) {
             emailContent += `--${boundary}\r\n`;
             emailContent += `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"\r\n`;
             emailContent += `Content-Disposition: attachment; filename="${attachment.filename}"\r\n`;
-            emailContent += `Content-Transfer-Encoding: base64\r\n`;
-            emailContent += `\r\n`;
+            emailContent += 'Content-Transfer-Encoding: base64\r\n';
+            emailContent += '\r\n';
             const base64Lines = attachment.data.match(/.{1,76}/g) || [];
             emailContent += base64Lines.join('\r\n');
-            emailContent += `\r\n`;
+            emailContent += '\r\n';
           }
 
           emailContent += `--${boundary}--\r\n`;
@@ -1517,8 +1512,10 @@ export function registerGmailTools(options: GmailToolOptions) {
           // The data is already base64url encoded from Gmail API
           result += `**Base64 Data (first 500 chars):**\n${attachment.data.substring(0, 500)}${attachment.data.length > 500 ? '...' : ''}\n\n`;
           result += `**Full data length:** ${attachment.data.length} characters\n`;
-          result += `\nNote: Data is base64url encoded. To decode, replace - with + and _ with /, then base64 decode.`;
-          result += `\n\nTip: Use downloadGmailAttachment to get full data or save directly to a file.`;
+          result +=
+            '\nNote: Data is base64url encoded. To decode, replace - with + and _ with /, then base64 decode.';
+          result +=
+            '\n\nTip: Use downloadGmailAttachment to get full data or save directly to a file.';
         } else {
           result += 'No attachment data available.';
         }
@@ -1613,9 +1610,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (args.savePath) {
           // Validate that savePath is absolute
           if (!path.isAbsolute(args.savePath)) {
-            throw new Error(
-              `savePath must be an absolute path. Received: ${args.savePath}`
-            );
+            throw new Error(`savePath must be an absolute path. Received: ${args.savePath}`);
           }
 
           // Decode and save to file
@@ -1860,7 +1855,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           return '';
         };
 
-        let result = `**Email Thread**\n\n`;
+        let result = '**Email Thread**\n\n';
         result += `Thread ID: ${thread.id}\n`;
         result += `Messages in thread: ${messages.length}\n`;
         result += `History ID: ${thread.historyId}\n\n`;
@@ -2046,7 +2041,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           if (criteria.to) result += `     - To: ${criteria.to}\n`;
           if (criteria.subject) result += `     - Subject: ${criteria.subject}\n`;
           if (criteria.query) result += `     - Query: ${criteria.query}\n`;
-          if (criteria.hasAttachment) result += `     - Has attachment: yes\n`;
+          if (criteria.hasAttachment) result += '     - Has attachment: yes\n';
           if (criteria.size)
             result += `     - Size: ${criteria.sizeComparison} ${criteria.size} bytes\n`;
 
@@ -2149,7 +2144,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         if (args.to) result += `- To: ${args.to}\n`;
         if (args.subject) result += `- Subject: ${args.subject}\n`;
         if (args.query) result += `- Query: ${args.query}\n`;
-        if (args.hasAttachment) result += `- Has attachment: yes\n`;
+        if (args.hasAttachment) result += '- Has attachment: yes\n';
         result += '\n**Actions:**\n';
         if (args.addLabelIds?.length) result += `- Add labels: ${args.addLabelIds.join(', ')}\n`;
         if (args.removeLabelIds?.length)

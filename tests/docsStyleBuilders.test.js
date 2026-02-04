@@ -6,23 +6,22 @@ import {
   getTabTextLength,
   findTabById,
 } from '../dist/googleDocsApiHelpers.js';
-import assert from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, it, expect } from 'vitest';
 
 describe('Docs Style Request Builders', () => {
   describe('buildUpdateTextStyleRequest', () => {
     it('should return null when no styles provided', () => {
       const result = buildUpdateTextStyleRequest(0, 10, {});
-      assert.strictEqual(result, null);
+      expect(result).toBe(null);
     });
 
     it('should build request for bold style', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { bold: true });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['bold']);
-      assert.strictEqual(result.request.updateTextStyle.textStyle.bold, true);
-      assert.strictEqual(result.request.updateTextStyle.range.startIndex, 0);
-      assert.strictEqual(result.request.updateTextStyle.range.endIndex, 10);
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['bold']);
+      expect(result.request.updateTextStyle.textStyle.bold).toBe(true);
+      expect(result.request.updateTextStyle.range.startIndex).toBe(0);
+      expect(result.request.updateTextStyle.range.endIndex).toBe(10);
     });
 
     it('should build request for multiple text styles', () => {
@@ -32,19 +31,19 @@ describe('Docs Style Request Builders', () => {
         underline: true,
         strikethrough: false,
       });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['bold', 'italic', 'underline', 'strikethrough']);
-      assert.strictEqual(result.request.updateTextStyle.textStyle.bold, true);
-      assert.strictEqual(result.request.updateTextStyle.textStyle.italic, true);
-      assert.strictEqual(result.request.updateTextStyle.textStyle.underline, true);
-      assert.strictEqual(result.request.updateTextStyle.textStyle.strikethrough, false);
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['bold', 'italic', 'underline', 'strikethrough']);
+      expect(result.request.updateTextStyle.textStyle.bold).toBe(true);
+      expect(result.request.updateTextStyle.textStyle.italic).toBe(true);
+      expect(result.request.updateTextStyle.textStyle.underline).toBe(true);
+      expect(result.request.updateTextStyle.textStyle.strikethrough).toBe(false);
     });
 
     it('should build request for fontSize', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { fontSize: 14 });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['fontSize']);
-      assert.deepStrictEqual(result.request.updateTextStyle.textStyle.fontSize, {
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['fontSize']);
+      expect(result.request.updateTextStyle.textStyle.fontSize).toEqual({
         magnitude: 14,
         unit: 'PT',
       });
@@ -52,84 +51,74 @@ describe('Docs Style Request Builders', () => {
 
     it('should build request for fontFamily', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { fontFamily: 'Arial' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['weightedFontFamily']);
-      assert.deepStrictEqual(result.request.updateTextStyle.textStyle.weightedFontFamily, {
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['weightedFontFamily']);
+      expect(result.request.updateTextStyle.textStyle.weightedFontFamily).toEqual({
         fontFamily: 'Arial',
       });
     });
 
     it('should build request for foregroundColor', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { foregroundColor: '#FF0000' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['foregroundColor']);
-      assert.deepStrictEqual(
-        result.request.updateTextStyle.textStyle.foregroundColor.color.rgbColor,
-        {
-          red: 1,
-          green: 0,
-          blue: 0,
-        }
-      );
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['foregroundColor']);
+      expect(result.request.updateTextStyle.textStyle.foregroundColor.color.rgbColor).toEqual({
+        red: 1,
+        green: 0,
+        blue: 0,
+      });
     });
 
     it('should build request for backgroundColor', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { backgroundColor: '#00FF00' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['backgroundColor']);
-      assert.deepStrictEqual(
-        result.request.updateTextStyle.textStyle.backgroundColor.color.rgbColor,
-        {
-          red: 0,
-          green: 1,
-          blue: 0,
-        }
-      );
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['backgroundColor']);
+      expect(result.request.updateTextStyle.textStyle.backgroundColor.color.rgbColor).toEqual({
+        red: 0,
+        green: 1,
+        blue: 0,
+      });
     });
 
     it('should build request for linkUrl', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { linkUrl: 'https://example.com' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['link']);
-      assert.deepStrictEqual(result.request.updateTextStyle.textStyle.link, {
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['link']);
+      expect(result.request.updateTextStyle.textStyle.link).toEqual({
         url: 'https://example.com',
       });
     });
 
     it('should build request for removeLink', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { removeLink: true });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['link']);
-      assert.deepStrictEqual(result.request.updateTextStyle.textStyle.link, {});
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['link']);
+      expect(result.request.updateTextStyle.textStyle.link).toEqual({});
     });
 
     it('should throw UserError for invalid hex color', () => {
-      assert.throws(() => buildUpdateTextStyleRequest(0, 10, { foregroundColor: 'invalid' }), {
-        name: 'UserError',
-      });
-      assert.throws(() => buildUpdateTextStyleRequest(0, 10, { backgroundColor: 'notacolor' }), {
-        name: 'UserError',
-      });
+      expect(() => buildUpdateTextStyleRequest(0, 10, { foregroundColor: 'invalid' })).toThrow();
+      expect(() => buildUpdateTextStyleRequest(0, 10, { backgroundColor: 'notacolor' })).toThrow();
     });
 
     it('should build fields string correctly', () => {
       const result = buildUpdateTextStyleRequest(0, 10, { bold: true, italic: true });
-      assert.ok(result);
-      assert.strictEqual(result.request.updateTextStyle.fields, 'bold,italic');
+      expect(result).toBeTruthy();
+      expect(result.request.updateTextStyle.fields).toBe('bold,italic');
     });
   });
 
   describe('buildUpdateParagraphStyleRequest', () => {
     it('should return null when no styles provided', () => {
       const result = buildUpdateParagraphStyleRequest(0, 10, {});
-      assert.strictEqual(result, null);
+      expect(result).toBe(null);
     });
 
     it('should build request for alignment', () => {
       const result = buildUpdateParagraphStyleRequest(0, 10, { alignment: 'CENTER' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['alignment']);
-      assert.strictEqual(result.request.updateParagraphStyle.paragraphStyle.alignment, 'CENTER');
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['alignment']);
+      expect(result.request.updateParagraphStyle.paragraphStyle.alignment).toBe('CENTER');
     });
 
     it('should build request for indentation', () => {
@@ -137,13 +126,13 @@ describe('Docs Style Request Builders', () => {
         indentStart: 36,
         indentEnd: 18,
       });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['indentStart', 'indentEnd']);
-      assert.deepStrictEqual(result.request.updateParagraphStyle.paragraphStyle.indentStart, {
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['indentStart', 'indentEnd']);
+      expect(result.request.updateParagraphStyle.paragraphStyle.indentStart).toEqual({
         magnitude: 36,
         unit: 'PT',
       });
-      assert.deepStrictEqual(result.request.updateParagraphStyle.paragraphStyle.indentEnd, {
+      expect(result.request.updateParagraphStyle.paragraphStyle.indentEnd).toEqual({
         magnitude: 18,
         unit: 'PT',
       });
@@ -154,13 +143,13 @@ describe('Docs Style Request Builders', () => {
         spaceAbove: 12,
         spaceBelow: 6,
       });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['spaceAbove', 'spaceBelow']);
-      assert.deepStrictEqual(result.request.updateParagraphStyle.paragraphStyle.spaceAbove, {
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['spaceAbove', 'spaceBelow']);
+      expect(result.request.updateParagraphStyle.paragraphStyle.spaceAbove).toEqual({
         magnitude: 12,
         unit: 'PT',
       });
-      assert.deepStrictEqual(result.request.updateParagraphStyle.paragraphStyle.spaceBelow, {
+      expect(result.request.updateParagraphStyle.paragraphStyle.spaceBelow).toEqual({
         magnitude: 6,
         unit: 'PT',
       });
@@ -168,26 +157,23 @@ describe('Docs Style Request Builders', () => {
 
     it('should build request for namedStyleType', () => {
       const result = buildUpdateParagraphStyleRequest(0, 10, { namedStyleType: 'HEADING_1' });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['namedStyleType']);
-      assert.strictEqual(
-        result.request.updateParagraphStyle.paragraphStyle.namedStyleType,
-        'HEADING_1'
-      );
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['namedStyleType']);
+      expect(result.request.updateParagraphStyle.paragraphStyle.namedStyleType).toBe('HEADING_1');
     });
 
     it('should build request for keepWithNext', () => {
       const result = buildUpdateParagraphStyleRequest(0, 10, { keepWithNext: true });
-      assert.ok(result);
-      assert.deepStrictEqual(result.fields, ['keepWithNext']);
-      assert.strictEqual(result.request.updateParagraphStyle.paragraphStyle.keepWithNext, true);
+      expect(result).toBeTruthy();
+      expect(result.fields).toEqual(['keepWithNext']);
+      expect(result.request.updateParagraphStyle.paragraphStyle.keepWithNext).toBe(true);
     });
 
     it('should set correct range indices', () => {
       const result = buildUpdateParagraphStyleRequest(100, 200, { alignment: 'START' });
-      assert.ok(result);
-      assert.strictEqual(result.request.updateParagraphStyle.range.startIndex, 100);
-      assert.strictEqual(result.request.updateParagraphStyle.range.endIndex, 200);
+      expect(result).toBeTruthy();
+      expect(result.request.updateParagraphStyle.range.startIndex).toBe(100);
+      expect(result.request.updateParagraphStyle.range.endIndex).toBe(200);
     });
   });
 });
@@ -197,13 +183,13 @@ describe('Docs Tab Helpers', () => {
     it('should return empty array for document with no tabs', () => {
       const doc = {};
       const result = getAllTabs(doc);
-      assert.deepStrictEqual(result, []);
+      expect(result).toEqual([]);
     });
 
     it('should return empty array for document with empty tabs array', () => {
       const doc = { tabs: [] };
       const result = getAllTabs(doc);
-      assert.deepStrictEqual(result, []);
+      expect(result).toEqual([]);
     });
 
     it('should return flat list of tabs with level info', () => {
@@ -214,11 +200,11 @@ describe('Docs Tab Helpers', () => {
         ],
       };
       const result = getAllTabs(doc);
-      assert.strictEqual(result.length, 2);
-      assert.strictEqual(result[0].tabProperties.tabId, 'tab1');
-      assert.strictEqual(result[0].level, 0);
-      assert.strictEqual(result[1].tabProperties.tabId, 'tab2');
-      assert.strictEqual(result[1].level, 0);
+      expect(result.length).toBe(2);
+      expect(result[0].tabProperties.tabId).toBe('tab1');
+      expect(result[0].level).toBe(0);
+      expect(result[1].tabProperties.tabId).toBe('tab2');
+      expect(result[1].level).toBe(0);
     });
 
     it('should flatten nested child tabs with correct levels', () => {
@@ -238,37 +224,37 @@ describe('Docs Tab Helpers', () => {
         ],
       };
       const result = getAllTabs(doc);
-      assert.strictEqual(result.length, 5);
+      expect(result.length).toBe(5);
 
       // Check order and levels
-      assert.strictEqual(result[0].tabProperties.tabId, 'parent1');
-      assert.strictEqual(result[0].level, 0);
+      expect(result[0].tabProperties.tabId).toBe('parent1');
+      expect(result[0].level).toBe(0);
 
-      assert.strictEqual(result[1].tabProperties.tabId, 'child1');
-      assert.strictEqual(result[1].level, 1);
+      expect(result[1].tabProperties.tabId).toBe('child1');
+      expect(result[1].level).toBe(1);
 
-      assert.strictEqual(result[2].tabProperties.tabId, 'grandchild1');
-      assert.strictEqual(result[2].level, 2);
+      expect(result[2].tabProperties.tabId).toBe('grandchild1');
+      expect(result[2].level).toBe(2);
 
-      assert.strictEqual(result[3].tabProperties.tabId, 'child2');
-      assert.strictEqual(result[3].level, 1);
+      expect(result[3].tabProperties.tabId).toBe('child2');
+      expect(result[3].level).toBe(1);
 
-      assert.strictEqual(result[4].tabProperties.tabId, 'parent2');
-      assert.strictEqual(result[4].level, 0);
+      expect(result[4].tabProperties.tabId).toBe('parent2');
+      expect(result[4].level).toBe(0);
     });
   });
 
   describe('getTabTextLength', () => {
     it('should return 0 for undefined documentTab', () => {
-      assert.strictEqual(getTabTextLength(undefined), 0);
+      expect(getTabTextLength(undefined)).toBe(0);
     });
 
     it('should return 0 for documentTab with no body', () => {
-      assert.strictEqual(getTabTextLength({}), 0);
+      expect(getTabTextLength({})).toBe(0);
     });
 
     it('should return 0 for documentTab with no content', () => {
-      assert.strictEqual(getTabTextLength({ body: {} }), 0);
+      expect(getTabTextLength({ body: {} })).toBe(0);
     });
 
     it('should count text in paragraphs', () => {
@@ -283,7 +269,7 @@ describe('Docs Tab Helpers', () => {
           ],
         },
       };
-      assert.strictEqual(getTabTextLength(documentTab), 11); // 'Hello ' + 'World'
+      expect(getTabTextLength(documentTab)).toBe(11); // 'Hello ' + 'World'
     });
 
     it('should count text in tables', () => {
@@ -321,7 +307,7 @@ describe('Docs Tab Helpers', () => {
           ],
         },
       };
-      assert.strictEqual(getTabTextLength(documentTab), 12); // 'Cell 1' + 'Cell 2'
+      expect(getTabTextLength(documentTab)).toBe(12); // 'Cell 1' + 'Cell 2'
     });
 
     it('should handle mixed content', () => {
@@ -360,19 +346,19 @@ describe('Docs Tab Helpers', () => {
           ],
         },
       };
-      assert.strictEqual(getTabTextLength(documentTab), 15); // 'Intro\n' + 'Data' + 'Outro'
+      expect(getTabTextLength(documentTab)).toBe(15); // 'Intro\n' + 'Data' + 'Outro'
     });
   });
 
   describe('findTabById', () => {
     it('should return null for document with no tabs', () => {
       const doc = {};
-      assert.strictEqual(findTabById(doc, 'tab1'), null);
+      expect(findTabById(doc, 'tab1')).toBe(null);
     });
 
     it('should return null for document with empty tabs', () => {
       const doc = { tabs: [] };
-      assert.strictEqual(findTabById(doc, 'tab1'), null);
+      expect(findTabById(doc, 'tab1')).toBe(null);
     });
 
     it('should find top-level tab', () => {
@@ -383,9 +369,9 @@ describe('Docs Tab Helpers', () => {
         ],
       };
       const result = findTabById(doc, 'tab2');
-      assert.ok(result);
-      assert.strictEqual(result.tabProperties.tabId, 'tab2');
-      assert.strictEqual(result.tabProperties.title, 'Tab 2');
+      expect(result).toBeTruthy();
+      expect(result.tabProperties.tabId).toBe('tab2');
+      expect(result.tabProperties.title).toBe('Tab 2');
     });
 
     it('should find nested child tab', () => {
@@ -404,19 +390,19 @@ describe('Docs Tab Helpers', () => {
       };
 
       const child = findTabById(doc, 'child');
-      assert.ok(child);
-      assert.strictEqual(child.tabProperties.title, 'Child');
+      expect(child).toBeTruthy();
+      expect(child.tabProperties.title).toBe('Child');
 
       const grandchild = findTabById(doc, 'grandchild');
-      assert.ok(grandchild);
-      assert.strictEqual(grandchild.tabProperties.title, 'Grandchild');
+      expect(grandchild).toBeTruthy();
+      expect(grandchild.tabProperties.title).toBe('Grandchild');
     });
 
     it('should return null for non-existent tab', () => {
       const doc = {
         tabs: [{ tabProperties: { tabId: 'tab1', title: 'Tab 1' } }],
       };
-      assert.strictEqual(findTabById(doc, 'nonexistent'), null);
+      expect(findTabById(doc, 'nonexistent')).toBe(null);
     });
   });
 });
