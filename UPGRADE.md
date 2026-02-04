@@ -110,6 +110,7 @@ If you want to use Gmail, Calendar, Slides, or Forms, you need to add new OAuth 
 3. Click **Edit App** → **Scopes** → **Add or Remove Scopes**
 4. Add these new scopes:
    - `https://www.googleapis.com/auth/gmail.modify`
+   - `https://www.googleapis.com/auth/gmail.settings.basic` (for Gmail filters)
    - `https://www.googleapis.com/auth/calendar`
    - `https://www.googleapis.com/auth/presentations`
    - `https://www.googleapis.com/auth/forms.body`

@@ -238,6 +238,7 @@ echo "Add test users at: https://console.cloud.google.com/apis/credentials/conse
       - `https://www.googleapis.com/auth/spreadsheets` (Google Sheets)
       - `https://www.googleapis.com/auth/drive` (Google Drive - full access)
       - `https://www.googleapis.com/auth/gmail.modify` (Gmail)
+      - `https://www.googleapis.com/auth/gmail.settings.basic` (Gmail filters)
       - `https://www.googleapis.com/auth/calendar` (Google Calendar)
       - `https://www.googleapis.com/auth/presentations` (Google Slides)
       - `https://www.googleapis.com/auth/forms.body` (Google Forms)

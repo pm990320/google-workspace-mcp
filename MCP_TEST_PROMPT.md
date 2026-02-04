@@ -180,16 +180,24 @@ First, list available accounts and use one for all subsequent tests. Store the a
 25. **Batch add labels** to multiple messages using `batchAddGmailLabels`
 26. **Batch remove labels** from multiple messages using `batchRemoveGmailLabels`
 
+**Label Management:**
+27. **Create a test label** using `createGmailLabel` with name "MCP-Test-Label"
+28. **List labels** to verify the new label was created
+29. **Apply the label** to a message using `addGmailLabel` with the new label ID
+30. **Remove the label** from the message using `removeGmailLabel`
+
 **Filter Management:**
-27. **List all Gmail filters** using `listGmailFilters`
-28. **Create a test filter** using `createGmailFilter` (e.g., from:test@example.com → add label)
-29. **List filters again** to verify the filter was created
-30. **Delete the test filter** using `deleteGmailFilter`
+31. **List all Gmail filters** using `listGmailFilters`
+32. **Create a test filter** using `createGmailFilter` (e.g., from:test@example.com → add label)
+33. **List filters again** to verify the filter was created
+34. **Delete the test filter** using `deleteGmailFilter`
 
 **Cleanup:**
-31. **Create another draft** for cleanup testing
-32. **Delete the draft** (permanent deletion)
-33. **Delete the sent message** (moves to trash)
+35. **Create another draft** for cleanup testing
+36. **Delete the draft** (permanent deletion)
+37. **Delete the sent message** (moves to trash)
+
+Note: Test labels created during testing should be manually deleted in Gmail settings if desired.
 
 ---
 
@@ -264,11 +272,11 @@ The following tools have known limitations and are excluded:
 | 1 | Docs | 29 |
 | 2 | Drive | 10 |
 | 3 | Sheets | 10 |
-| 4 | Gmail | 33 |
+| 4 | Gmail | 37 |
 | 5 | Calendar | 7 |
 | 6 | Slides | 7 |
 | 7 | Forms | 9 |
-| **Total** | | **~106** |
+| **Total** | | **~110** |
 
 ---
 

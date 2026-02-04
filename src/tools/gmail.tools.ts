@@ -343,6 +343,92 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
   });
 
+  // --- Create Gmail Label ---
+  server.addTool({
+    name: 'createGmailLabel',
+    description:
+      'Create a new Gmail label (folder). Labels can be used to organize emails. After creating a label, use addGmailLabel to apply it to messages.',
+    annotations: {
+      title: 'Create Gmail Label',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      name: z
+        .string()
+        .describe(
+          'Name of the label to create. Use "/" for nested labels (e.g., "Work/Projects")'
+        ),
+      labelListVisibility: z
+        .enum(['labelShow', 'labelShowIfUnread', 'labelHide'])
+        .optional()
+        .default('labelShow')
+        .describe(
+          'Whether to show the label in the label list: labelShow (always), labelShowIfUnread (only when unread), labelHide (hidden)'
+        ),
+      messageListVisibility: z
+        .enum(['show', 'hide'])
+        .optional()
+        .default('show')
+        .describe('Whether to show the label in the message list'),
+      backgroundColor: z
+        .string()
+        .optional()
+        .describe('Background color in hex format (e.g., "#16a765")'),
+      textColor: z
+        .string()
+        .optional()
+        .describe('Text color in hex format (e.g., "#ffffff")'),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+
+        const labelColor =
+          args.backgroundColor || args.textColor
+            ? {
+                backgroundColor: args.backgroundColor,
+                textColor: args.textColor,
+              }
+            : undefined;
+
+        const response = await gmail.users.labels.create({
+          userId: 'me',
+          requestBody: {
+            name: args.name,
+            labelListVisibility: args.labelListVisibility,
+            messageListVisibility: args.messageListVisibility,
+            color: labelColor,
+          },
+        });
+
+        const label = response.data;
+
+        let result = `Successfully created label "${args.name}".\n\n`;
+        result += `Label ID: ${label.id}\n`;
+        result += `Name: ${label.name}\n`;
+        result += `Type: ${label.type}\n`;
+        if (label.labelListVisibility) {
+          result += `Label List Visibility: ${label.labelListVisibility}\n`;
+        }
+        if (label.messageListVisibility) {
+          result += `Message List Visibility: ${label.messageListVisibility}\n`;
+        }
+        if (label.color) {
+          result += `Color: ${label.color.backgroundColor || 'default'} / ${label.color.textColor || 'default'}\n`;
+        }
+        result += `\nUse this Label ID with addGmailLabel to apply it to messages.`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('createGmailLabel', error));
+      }
+    },
+  });
+
   // --- Add Gmail Label ---
   server.addTool({
     name: 'addGmailLabel',
