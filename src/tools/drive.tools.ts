@@ -2,9 +2,16 @@
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { type drive_v3, type docs_v1 } from 'googleapis';
+import { createReadStream, createWriteStream, existsSync, statSync } from 'fs';
+import { basename, dirname } from 'path';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
+import mime from 'mime-types';
 import { AccountDocumentParameters, type DriveToolOptions } from '../types.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { addAuthUserToUrl, getDocsUrl, getDriveFileUrl, getDriveFolderUrl } from '../urlHelpers.js';
+import { escapeDriveQuery, validateReadPath, validateWritePath } from '../securityHelpers.js';
+import { getServerConfig } from '../serverWrapper.js';
 
 export function registerDriveTools(options: DriveToolOptions) {
   const { server, getDriveClient, getDocsClient, getAccountEmail } = options;
@@ -61,7 +68,8 @@ export function registerDriveTools(options: DriveToolOptions) {
       try {
         let queryString = "mimeType='application/vnd.google-apps.document' and trashed=false";
         if (args.query) {
-          queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+          const safeQuery = escapeDriveQuery(args.query);
+          queryString += ` and (name contains '${safeQuery}' or fullText contains '${safeQuery}')`;
         }
 
         // Don't use orderBy when query contains fullText search (Google Drive API limitation)
@@ -160,16 +168,19 @@ export function registerDriveTools(options: DriveToolOptions) {
       try {
         let queryString = "mimeType='application/vnd.google-apps.document' and trashed=false";
 
+        const safeSearchQuery = escapeDriveQuery(args.searchQuery);
         if (args.searchIn === 'name') {
-          queryString += ` and name contains '${args.searchQuery}'`;
+          queryString += ` and name contains '${safeSearchQuery}'`;
         } else if (args.searchIn === 'content') {
-          queryString += ` and fullText contains '${args.searchQuery}'`;
+          queryString += ` and fullText contains '${safeSearchQuery}'`;
         } else {
-          queryString += ` and (name contains '${args.searchQuery}' or fullText contains '${args.searchQuery}')`;
+          queryString += ` and (name contains '${safeSearchQuery}' or fullText contains '${safeSearchQuery}')`;
         }
 
         if (args.modifiedAfter) {
-          queryString += ` and modifiedTime > '${args.modifiedAfter}'`;
+          // modifiedAfter is expected to be an ISO 8601 date, escape it to be safe
+          const safeDate = escapeDriveQuery(args.modifiedAfter);
+          queryString += ` and modifiedTime > '${safeDate}'`;
         }
 
         // Don't use orderBy when query contains fullText search (Google Drive API limitation)
@@ -485,7 +496,8 @@ export function registerDriveTools(options: DriveToolOptions) {
       log.info(`Listing contents of folder: ${args.folderId}`);
 
       try {
-        let queryString = `'${args.folderId}' in parents and trashed=false`;
+        const safeFolderId = escapeDriveQuery(args.folderId);
+        let queryString = `'${safeFolderId}' in parents and trashed=false`;
 
         if (!args.includeSubfolders && !args.includeFiles) {
           throw new UserError('At least one of includeSubfolders or includeFiles must be true.');
@@ -1143,6 +1155,776 @@ export function registerDriveTools(options: DriveToolOptions) {
             'Permission denied. Make sure you have read access to the template and write access to the destination folder.'
           );
         throw new UserError(`Failed to create document from template: ${message}`);
+      }
+    },
+  });
+
+  // --- Upload File to Drive ---
+  server.addTool({
+    name: 'uploadFileToDrive',
+    description:
+      'Uploads a local file to Google Drive. Supports any file type. Use this to upload documents, images, PDFs, or any other files.',
+    annotations: {
+      title: 'Upload File to Drive',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      localPath: z.string().min(1).describe('Absolute path to the local file to upload.'),
+      fileName: z
+        .string()
+        .optional()
+        .describe('Name for the uploaded file in Drive. If not provided, uses the local filename.'),
+      folderId: z
+        .string()
+        .optional()
+        .describe('ID of the folder to upload to. If not provided, uploads to Drive root.'),
+      mimeType: z
+        .string()
+        .optional()
+        .describe('MIME type of the file. If not provided, auto-detected from file extension.'),
+      convertToGoogleFormat: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          'If true, converts supported files to Google format (e.g., .docx to Google Docs, .xlsx to Google Sheets).'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
+
+      // Validate path for security
+      const pathValidation = validateReadPath(args.localPath, getServerConfig().pathSecurity);
+      if (!pathValidation.valid) {
+        throw new UserError(`Cannot upload from this path: ${pathValidation.error}`);
+      }
+
+      log.info(`Uploading file from ${pathValidation.resolvedPath}`);
+
+      try {
+        // Validate file exists
+        if (!existsSync(pathValidation.resolvedPath)) {
+          throw new UserError(`File not found: ${pathValidation.resolvedPath}`);
+        }
+
+        // Get file stats
+        const stats = statSync(pathValidation.resolvedPath);
+        if (!stats.isFile()) {
+          throw new UserError(`Path is not a file: ${pathValidation.resolvedPath}`);
+        }
+
+        const fileName = args.fileName || basename(pathValidation.resolvedPath);
+        const detectedMimeType = mime.lookup(pathValidation.resolvedPath) || 'application/octet-stream';
+        const uploadMimeType = args.mimeType || detectedMimeType;
+
+        // Determine if we should convert to Google format
+        let googleMimeType: string | undefined;
+        if (args.convertToGoogleFormat) {
+          const mimeTypeMap: Record<string, string> = {
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+              'application/vnd.google-apps.document',
+            'application/msword': 'application/vnd.google-apps.document',
+            'text/plain': 'application/vnd.google-apps.document',
+            'application/rtf': 'application/vnd.google-apps.document',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+              'application/vnd.google-apps.spreadsheet',
+            'application/vnd.ms-excel': 'application/vnd.google-apps.spreadsheet',
+            'text/csv': 'application/vnd.google-apps.spreadsheet',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+              'application/vnd.google-apps.presentation',
+            'application/vnd.ms-powerpoint': 'application/vnd.google-apps.presentation',
+          };
+          googleMimeType = mimeTypeMap[uploadMimeType];
+        }
+
+        const fileMetadata: drive_v3.Schema$File = {
+          name: fileName,
+          mimeType: googleMimeType,
+        };
+
+        if (args.folderId) {
+          fileMetadata.parents = [args.folderId];
+        }
+
+        const response = await drive.files.create({
+          requestBody: fileMetadata,
+          media: {
+            mimeType: uploadMimeType,
+            body: createReadStream(pathValidation.resolvedPath),
+          },
+          fields: 'id,name,mimeType,size,webViewLink,webContentLink',
+        });
+
+        const file = response.data;
+        const fileSizeKB = stats.size > 0 ? Math.round(stats.size / 1024) : 0;
+
+        // Generate appropriate link
+        let link: string | null | undefined;
+        if (file.id) {
+          if (file.mimeType === 'application/vnd.google-apps.document') {
+            link = getDocsUrl(file.id, email);
+          } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+            link = addAuthUserToUrl(
+              `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+              email
+            );
+          } else if (file.mimeType === 'application/vnd.google-apps.presentation') {
+            link = addAuthUserToUrl(
+              `https://docs.google.com/presentation/d/${file.id}/edit`,
+              email
+            );
+          } else {
+            link = file.webViewLink
+              ? addAuthUserToUrl(file.webViewLink, email)
+              : getDriveFileUrl(file.id, email);
+          }
+        } else {
+          link = file.webViewLink;
+        }
+
+        let result = `Successfully uploaded "${file.name}" (ID: ${file.id})\n`;
+        result += `Size: ${fileSizeKB} KB\n`;
+        result += `Type: ${file.mimeType}\n`;
+        result += `View Link: ${link}`;
+
+        if (file.webContentLink) {
+          result += `\nDirect Download: ${file.webContentLink}`;
+        }
+
+        if (googleMimeType) {
+          result += '\n\nFile was converted to Google format.';
+        }
+
+        return result;
+      } catch (error: unknown) {
+        if (error instanceof UserError) throw error;
+        const message = getErrorMessage(error);
+        log.error(`Error uploading file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('Destination folder not found. Check the folder ID.');
+        if (code === 403)
+          throw new UserError(
+            'Permission denied. Make sure you have write access to the destination folder.'
+          );
+        throw new UserError(`Failed to upload file: ${message}`);
+      }
+    },
+  });
+
+  // --- Download from Drive ---
+  server.addTool({
+    name: 'downloadFromDrive',
+    description:
+      'Downloads a file from Google Drive to your local filesystem. For Google Docs/Sheets/Slides, exports to a specified format.',
+    annotations: {
+      title: 'Download from Drive',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      fileId: z.string().min(1).describe('ID of the file to download.'),
+      localPath: z
+        .string()
+        .min(1)
+        .describe('Absolute path where the file should be saved locally.'),
+      exportFormat: z
+        .enum(['pdf', 'docx', 'txt', 'xlsx', 'csv', 'pptx', 'html', 'png', 'jpeg'])
+        .optional()
+        .describe(
+          'Export format for Google Docs/Sheets/Slides. Required for native Google files. Options: pdf, docx, txt, xlsx, csv, pptx, html, png, jpeg.'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const drive = await getDriveClient(args.account);
+
+      // Validate path for security
+      const pathValidation = validateWritePath(args.localPath, getServerConfig().pathSecurity);
+      if (!pathValidation.valid) {
+        throw new UserError(`Cannot download to this path: ${pathValidation.error}`);
+      }
+
+      log.info(`Downloading file ${args.fileId} to ${pathValidation.resolvedPath}`);
+
+      try {
+        // Validate destination directory exists
+        const destDir = dirname(pathValidation.resolvedPath);
+        if (!existsSync(destDir)) {
+          throw new UserError(`Destination directory does not exist: ${destDir}`);
+        }
+
+        // Get file metadata first
+        const metadata = await drive.files.get({
+          fileId: args.fileId,
+          fields: 'id,name,mimeType,size',
+        });
+
+        const fileMimeType = metadata.data.mimeType;
+        const fileName = metadata.data.name;
+        const isGoogleNative = fileMimeType?.startsWith('application/vnd.google-apps');
+
+        // Map export formats to MIME types
+        const exportMimeTypes: Record<string, string> = {
+          pdf: 'application/pdf',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          txt: 'text/plain',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          csv: 'text/csv',
+          pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          html: 'text/html',
+          png: 'image/png',
+          jpeg: 'image/jpeg',
+        };
+
+        let response;
+
+        if (isGoogleNative) {
+          // Google native files must be exported
+          if (!args.exportFormat) {
+            throw new UserError(
+              `This is a Google ${fileMimeType?.replace('application/vnd.google-apps.', '')} file. ` +
+                'Please specify an exportFormat (pdf, docx, txt, xlsx, csv, pptx, html, png, jpeg).'
+            );
+          }
+
+          const exportMimeType = exportMimeTypes[args.exportFormat];
+          if (!exportMimeType) {
+            throw new UserError(
+              `Unsupported export format: ${args.exportFormat}. ` +
+                'Supported formats: pdf, docx, txt, xlsx, csv, pptx, html, png, jpeg.'
+            );
+          }
+
+          response = await drive.files.export(
+            { fileId: args.fileId, mimeType: exportMimeType },
+            { responseType: 'stream' }
+          );
+        } else {
+          // Binary files can be downloaded directly
+          response = await drive.files.get(
+            { fileId: args.fileId, alt: 'media' },
+            { responseType: 'stream' }
+          );
+        }
+
+        // Write to file
+        const writeStream = createWriteStream(pathValidation.resolvedPath);
+        await pipeline(response.data as Readable, writeStream);
+
+        // Get downloaded file size
+        const downloadedStats = statSync(pathValidation.resolvedPath);
+        const fileSizeKB = Math.round(downloadedStats.size / 1024);
+
+        let result = `Successfully downloaded "${fileName}" to ${pathValidation.resolvedPath}\n`;
+        result += `Size: ${fileSizeKB} KB`;
+
+        if (isGoogleNative && args.exportFormat) {
+          result += `\nExported as: ${args.exportFormat.toUpperCase()}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        if (error instanceof UserError) throw error;
+        const message = getErrorMessage(error);
+        log.error(`Error downloading file: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('File not found. Check the file ID.');
+        if (code === 403)
+          throw new UserError('Permission denied. Make sure you have access to this file.');
+        throw new UserError(`Failed to download file: ${message}`);
+      }
+    },
+  });
+
+  // --- Get Shareable Link ---
+  server.addTool({
+    name: 'getShareableLink',
+    description: 'Gets or creates a shareable link for a file with specified permission settings.',
+    annotations: {
+      title: 'Get Shareable Link',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      fileId: z.string().min(1).describe('ID of the file to share.'),
+      shareWith: z
+        .enum(['anyone', 'anyoneWithLink', 'domain'])
+        .default('anyoneWithLink')
+        .describe(
+          'Who can access: "anyone" (public on web), "anyoneWithLink" (anyone with the link), "domain" (your organization).'
+        ),
+      role: z
+        .enum(['reader', 'commenter', 'writer'])
+        .default('reader')
+        .describe(
+          'Permission level: "reader" (view only), "commenter" (can comment), "writer" (can edit).'
+        ),
+      domain: z
+        .string()
+        .optional()
+        .describe(
+          'Required when shareWith is "domain". Your organization domain (e.g., "company.com").'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
+      log.info(`Creating shareable link for file ${args.fileId}`);
+
+      try {
+        // Validate domain parameter
+        if (args.shareWith === 'domain' && !args.domain) {
+          throw new UserError('The "domain" parameter is required when shareWith is "domain".');
+        }
+
+        // Get file info first
+        const fileInfo = await drive.files.get({
+          fileId: args.fileId,
+          fields: 'id,name,mimeType,webViewLink,webContentLink',
+        });
+
+        const fileName = fileInfo.data.name;
+        const fileMimeType = fileInfo.data.mimeType;
+
+        // Create the permission
+        const permissionBody: drive_v3.Schema$Permission = {
+          role: args.role,
+          type: args.shareWith === 'domain' ? 'domain' : 'anyone',
+        };
+
+        if (args.shareWith === 'domain' && args.domain) {
+          permissionBody.domain = args.domain;
+        }
+
+        // For "anyoneWithLink", we still use type "anyone" but the link is not discoverable
+        await drive.permissions.create({
+          fileId: args.fileId,
+          requestBody: permissionBody,
+        });
+
+        // Get the updated file with links
+        const updatedFile = await drive.files.get({
+          fileId: args.fileId,
+          fields: 'id,webViewLink,webContentLink',
+        });
+
+        // Generate appropriate link
+        let viewLink: string | null | undefined;
+        if (updatedFile.data.id) {
+          if (fileMimeType === 'application/vnd.google-apps.document') {
+            viewLink = getDocsUrl(updatedFile.data.id, email);
+          } else if (fileMimeType === 'application/vnd.google-apps.spreadsheet') {
+            viewLink = addAuthUserToUrl(
+              `https://docs.google.com/spreadsheets/d/${updatedFile.data.id}/edit`,
+              email
+            );
+          } else if (fileMimeType === 'application/vnd.google-apps.presentation') {
+            viewLink = addAuthUserToUrl(
+              `https://docs.google.com/presentation/d/${updatedFile.data.id}/edit`,
+              email
+            );
+          } else if (fileMimeType === 'application/vnd.google-apps.folder') {
+            viewLink = getDriveFolderUrl(updatedFile.data.id, email);
+          } else {
+            viewLink = updatedFile.data.webViewLink
+              ? addAuthUserToUrl(updatedFile.data.webViewLink, email)
+              : getDriveFileUrl(updatedFile.data.id, email);
+          }
+        } else {
+          viewLink = updatedFile.data.webViewLink;
+        }
+
+        const shareDescription =
+          args.shareWith === 'anyone'
+            ? 'Anyone on the internet'
+            : args.shareWith === 'domain'
+              ? `Anyone in ${args.domain}`
+              : 'Anyone with the link';
+
+        const roleDescription =
+          args.role === 'reader'
+            ? 'view'
+            : args.role === 'commenter'
+              ? 'view and comment'
+              : 'view, comment, and edit';
+
+        let result = `Successfully created shareable link for "${fileName}"\n\n`;
+        result += `**Access:** ${shareDescription} can ${roleDescription}\n`;
+        result += `**View Link:** ${viewLink}`;
+
+        if (updatedFile.data.webContentLink) {
+          result += `\n**Direct Download:** ${updatedFile.data.webContentLink}`;
+        }
+
+        return result;
+      } catch (error: unknown) {
+        if (error instanceof UserError) throw error;
+        const message = getErrorMessage(error);
+        log.error(`Error creating shareable link: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 404) throw new UserError('File not found. Check the file ID.');
+        if (code === 403)
+          throw new UserError(
+            'Permission denied. You may not have permission to share this file, or sharing may be restricted by your organization.'
+          );
+        throw new UserError(`Failed to create shareable link: ${message}`);
+      }
+    },
+  });
+
+  // --- List Recent Files ---
+  server.addTool({
+    name: 'listRecentFiles',
+    description:
+      'Lists recently modified files across all of Google Drive, not limited to a specific type.',
+    annotations: {
+      title: 'List Recent Files',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      maxResults: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(20)
+        .describe('Maximum number of files to return (1-100).'),
+      daysBack: z
+        .number()
+        .int()
+        .min(1)
+        .max(365)
+        .optional()
+        .default(7)
+        .describe('Only show files modified within this many days.'),
+      fileType: z
+        .enum(['all', 'documents', 'spreadsheets', 'presentations', 'folders', 'pdfs', 'images'])
+        .optional()
+        .default('all')
+        .describe('Filter by file type.'),
+    }),
+    execute: async (args, { log }) => {
+      const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
+      log.info(
+        `Listing recent files: ${args.maxResults} results, ${args.daysBack} days back, type: ${args.fileType}`
+      );
+
+      try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - args.daysBack);
+        const cutoffDateStr = cutoffDate.toISOString();
+
+        let queryString = `trashed=false and modifiedTime > '${cutoffDateStr}'`;
+
+        // Add file type filter
+        const mimeTypeFilters: Record<string, string> = {
+          documents: "mimeType='application/vnd.google-apps.document'",
+          spreadsheets: "mimeType='application/vnd.google-apps.spreadsheet'",
+          presentations: "mimeType='application/vnd.google-apps.presentation'",
+          folders: "mimeType='application/vnd.google-apps.folder'",
+          pdfs: "mimeType='application/pdf'",
+          images: "(mimeType contains 'image/' or mimeType='application/vnd.google-apps.photo')",
+        };
+
+        if (args.fileType !== 'all' && mimeTypeFilters[args.fileType]) {
+          queryString += ` and ${mimeTypeFilters[args.fileType]}`;
+        }
+
+        const response = await drive.files.list({
+          q: queryString,
+          pageSize: args.maxResults,
+          orderBy: 'modifiedTime desc',
+          fields:
+            'files(id,name,mimeType,size,modifiedTime,webViewLink,owners(displayName),lastModifyingUser(displayName))',
+        });
+
+        const files = response.data.files ?? [];
+
+        if (files.length === 0) {
+          return `No files found that were modified in the last ${args.daysBack} day(s)${args.fileType !== 'all' ? ` matching type "${args.fileType}"` : ''}.`;
+        }
+
+        let result = `${files.length} recently modified file(s) (last ${args.daysBack} day${args.daysBack !== 1 ? 's' : ''}):\n\n`;
+
+        files.forEach((file, index) => {
+          const modifiedDate = file.modifiedTime
+            ? new Date(file.modifiedTime).toLocaleString()
+            : 'Unknown';
+          const lastModifier = file.lastModifyingUser?.displayName || 'Unknown';
+
+          // Determine file type label
+          let typeLabel = 'File';
+          if (file.mimeType === 'application/vnd.google-apps.document') typeLabel = 'Doc';
+          else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') typeLabel = 'Sheet';
+          else if (file.mimeType === 'application/vnd.google-apps.presentation')
+            typeLabel = 'Slides';
+          else if (file.mimeType === 'application/vnd.google-apps.folder') typeLabel = 'Folder';
+          else if (file.mimeType === 'application/pdf') typeLabel = 'PDF';
+          else if (file.mimeType?.startsWith('image/')) typeLabel = 'Image';
+
+          // Generate appropriate link
+          let link: string | null | undefined;
+          if (file.id) {
+            if (file.mimeType === 'application/vnd.google-apps.document') {
+              link = getDocsUrl(file.id, email);
+            } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+              link = addAuthUserToUrl(
+                `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+                email
+              );
+            } else if (file.mimeType === 'application/vnd.google-apps.presentation') {
+              link = addAuthUserToUrl(
+                `https://docs.google.com/presentation/d/${file.id}/edit`,
+                email
+              );
+            } else if (file.mimeType === 'application/vnd.google-apps.folder') {
+              link = getDriveFolderUrl(file.id, email);
+            } else {
+              link = file.webViewLink
+                ? addAuthUserToUrl(file.webViewLink, email)
+                : getDriveFileUrl(file.id, email);
+            }
+          } else {
+            link = file.webViewLink;
+          }
+
+          result += `${index + 1}. [${typeLabel}] **${file.name}**\n`;
+          result += `   ID: ${file.id}\n`;
+          result += `   Modified: ${modifiedDate} by ${lastModifier}\n`;
+          result += `   Link: ${link}\n\n`;
+        });
+
+        return result;
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error listing recent files: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 403)
+          throw new UserError(
+            'Permission denied. Make sure you have granted Google Drive access to the application.'
+          );
+        throw new UserError(`Failed to list recent files: ${message}`);
+      }
+    },
+  });
+
+  // --- Search Drive ---
+  server.addTool({
+    name: 'searchDrive',
+    description:
+      'Searches across all files in Google Drive by name, content, or type. More powerful than type-specific search tools.',
+    annotations: {
+      title: 'Search Drive',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z
+        .string()
+        .min(1)
+        .describe(
+          'The name of the Google account to use. Use listAccounts to see available accounts.'
+        ),
+      query: z.string().min(1).describe('Search term to find in file names or content.'),
+      searchIn: z
+        .enum(['name', 'content', 'both'])
+        .optional()
+        .default('both')
+        .describe('Where to search: file names only, file content only, or both.'),
+      fileType: z
+        .enum([
+          'all',
+          'documents',
+          'spreadsheets',
+          'presentations',
+          'pdfs',
+          'images',
+          'folders',
+          'videos',
+          'audio',
+        ])
+        .optional()
+        .default('all')
+        .describe('Filter results by file type.'),
+      inFolder: z
+        .string()
+        .optional()
+        .describe('Folder ID to search within. If not provided, searches entire Drive.'),
+      maxResults: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(25)
+        .describe('Maximum number of results to return.'),
+      modifiedAfter: z
+        .string()
+        .optional()
+        .describe(
+          'Only return files modified after this date (ISO 8601 format, e.g., "2024-01-01").'
+        ),
+    }),
+    execute: async (args, { log }) => {
+      const drive = await getDriveClient(args.account);
+      const email = await getAccountEmail(args.account);
+      log.info(`Searching Drive for "${args.query}" in ${args.searchIn}, type: ${args.fileType}`);
+
+      try {
+        let queryString = 'trashed=false';
+
+        // Add search query (escaped for security)
+        const safeQuery = escapeDriveQuery(args.query);
+        if (args.searchIn === 'name') {
+          queryString += ` and name contains '${safeQuery}'`;
+        } else if (args.searchIn === 'content') {
+          queryString += ` and fullText contains '${safeQuery}'`;
+        } else {
+          queryString += ` and (name contains '${safeQuery}' or fullText contains '${safeQuery}')`;
+        }
+
+        // Add file type filter
+        const mimeTypeFilters: Record<string, string> = {
+          documents: "mimeType='application/vnd.google-apps.document'",
+          spreadsheets: "mimeType='application/vnd.google-apps.spreadsheet'",
+          presentations: "mimeType='application/vnd.google-apps.presentation'",
+          pdfs: "mimeType='application/pdf'",
+          images: "(mimeType contains 'image/' or mimeType='application/vnd.google-apps.photo')",
+          folders: "mimeType='application/vnd.google-apps.folder'",
+          videos: "mimeType contains 'video/'",
+          audio: "mimeType contains 'audio/'",
+        };
+
+        if (args.fileType !== 'all' && mimeTypeFilters[args.fileType]) {
+          queryString += ` and ${mimeTypeFilters[args.fileType]}`;
+        }
+
+        // Add folder filter (escaped for security)
+        if (args.inFolder) {
+          const safeFolderId = escapeDriveQuery(args.inFolder);
+          queryString += ` and '${safeFolderId}' in parents`;
+        }
+
+        // Add date filter (escaped for security)
+        if (args.modifiedAfter) {
+          const safeDate = escapeDriveQuery(args.modifiedAfter);
+          queryString += ` and modifiedTime > '${safeDate}'`;
+        }
+
+        // Don't use orderBy when query contains fullText search (Google Drive API limitation)
+        const orderBy = args.searchIn === 'name' ? 'modifiedTime desc' : undefined;
+
+        const response = await drive.files.list({
+          q: queryString,
+          pageSize: args.maxResults,
+          orderBy,
+          fields:
+            'files(id,name,mimeType,size,modifiedTime,webViewLink,owners(displayName),parents)',
+        });
+
+        const files = response.data.files ?? [];
+
+        if (files.length === 0) {
+          let notFoundMsg = `No files found matching "${args.query}"`;
+          if (args.fileType !== 'all') notFoundMsg += ` (type: ${args.fileType})`;
+          if (args.inFolder) notFoundMsg += ' in the specified folder';
+          return notFoundMsg + '.';
+        }
+
+        let result = `Found ${files.length} file(s) matching "${args.query}":\n\n`;
+
+        files.forEach((file, index) => {
+          const modifiedDate = file.modifiedTime
+            ? new Date(file.modifiedTime).toLocaleDateString()
+            : 'Unknown';
+          const owner = file.owners?.[0]?.displayName || 'Unknown';
+
+          // Determine file type label
+          let typeLabel = 'File';
+          if (file.mimeType === 'application/vnd.google-apps.document') typeLabel = 'Doc';
+          else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') typeLabel = 'Sheet';
+          else if (file.mimeType === 'application/vnd.google-apps.presentation')
+            typeLabel = 'Slides';
+          else if (file.mimeType === 'application/vnd.google-apps.folder') typeLabel = 'Folder';
+          else if (file.mimeType === 'application/pdf') typeLabel = 'PDF';
+          else if (file.mimeType?.startsWith('image/')) typeLabel = 'Image';
+          else if (file.mimeType?.startsWith('video/')) typeLabel = 'Video';
+          else if (file.mimeType?.startsWith('audio/')) typeLabel = 'Audio';
+
+          // Generate appropriate link
+          let link: string | null | undefined;
+          if (file.id) {
+            if (file.mimeType === 'application/vnd.google-apps.document') {
+              link = getDocsUrl(file.id, email);
+            } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+              link = addAuthUserToUrl(
+                `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+                email
+              );
+            } else if (file.mimeType === 'application/vnd.google-apps.presentation') {
+              link = addAuthUserToUrl(
+                `https://docs.google.com/presentation/d/${file.id}/edit`,
+                email
+              );
+            } else if (file.mimeType === 'application/vnd.google-apps.folder') {
+              link = getDriveFolderUrl(file.id, email);
+            } else {
+              link = file.webViewLink
+                ? addAuthUserToUrl(file.webViewLink, email)
+                : getDriveFileUrl(file.id, email);
+            }
+          } else {
+            link = file.webViewLink;
+          }
+
+          result += `${index + 1}. [${typeLabel}] **${file.name}**\n`;
+          result += `   ID: ${file.id}\n`;
+          result += `   Modified: ${modifiedDate} by ${owner}\n`;
+          result += `   Link: ${link}\n\n`;
+        });
+
+        return result;
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        log.error(`Error searching Drive: ${message}`);
+        const code = isGoogleApiError(error) ? error.code : undefined;
+        if (code === 403)
+          throw new UserError(
+            'Permission denied. Make sure you have granted Google Drive access to the application.'
+          );
+        throw new UserError(`Failed to search Drive: ${message}`);
       }
     },
   });
