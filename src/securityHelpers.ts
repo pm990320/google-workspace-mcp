@@ -161,7 +161,10 @@ function isPathInAllowedDirs(filePath: string, allowedDirs: string[]): boolean {
   for (const allowedDir of allowedDirs) {
     const normalizedAllowed = path.normalize(allowedDir);
     // Check if the path starts with the allowed directory
-    if (normalizedPath.startsWith(normalizedAllowed + path.sep) || normalizedPath === normalizedAllowed) {
+    if (
+      normalizedPath.startsWith(normalizedAllowed + path.sep) ||
+      normalizedPath === normalizedAllowed
+    ) {
       return true;
     }
   }
@@ -306,15 +309,30 @@ export function validateWritePath(
  * Tools that involve third-party communication when certain parameters are used.
  * Maps tool name to the parameter(s) that trigger third-party communication.
  */
-export const THIRD_PARTY_TOOLS: Record<string, { params?: string[]; always?: boolean; description: string }> = {
+export const THIRD_PARTY_TOOLS: Record<
+  string,
+  { params?: string[]; always?: boolean; description: string }
+> = {
   // Gmail - sending/forwarding involves third parties
   sendGmailDraft: { always: true, description: 'Sends email to external recipients' },
-  createGmailFilter: { params: ['forward'], description: 'Can auto-forward emails to external addresses' },
+  createGmailFilter: {
+    params: ['forward'],
+    description: 'Can auto-forward emails to external addresses',
+  },
 
   // Calendar - attendees involve third parties
-  createCalendarEvent: { params: ['attendees', 'sendUpdates'], description: 'Can send calendar invites to attendees' },
-  updateCalendarEvent: { params: ['sendUpdates'], description: 'Can send update notifications to attendees' },
-  deleteCalendarEvent: { params: ['sendUpdates'], description: 'Can send cancellation notifications to attendees' },
+  createCalendarEvent: {
+    params: ['attendees', 'sendUpdates'],
+    description: 'Can send calendar invites to attendees',
+  },
+  updateCalendarEvent: {
+    params: ['sendUpdates'],
+    description: 'Can send update notifications to attendees',
+  },
+  deleteCalendarEvent: {
+    params: ['sendUpdates'],
+    description: 'Can send cancellation notifications to attendees',
+  },
 
   // Drive - sharing involves third parties
   shareFile: { always: true, description: 'Shares files with other users' },

@@ -274,11 +274,7 @@ describe('Excel Helpers', () => {
     describe('writeRange', () => {
       it('should write 2D array of values', () => {
         const sheet = getWorksheet(workbook, 'Sheet1');
-        const result = writeRange(sheet, 'D1', [
-          ['Country'],
-          ['USA'],
-          ['USA'],
-        ]);
+        const result = writeRange(sheet, 'D1', [['Country'], ['USA'], ['USA']]);
 
         expect(result).toEqual({
           updatedCells: 3,
@@ -292,10 +288,7 @@ describe('Excel Helpers', () => {
 
       it('should handle varying row lengths', () => {
         const sheet = getWorksheet(workbook, 'Sheet1');
-        const result = writeRange(sheet, 'E1', [
-          ['A', 'B', 'C'],
-          ['D'],
-        ]);
+        const result = writeRange(sheet, 'E1', [['A', 'B', 'C'], ['D']]);
 
         expect(result.updatedColumns).toBe(3);
         expect(result.updatedRows).toBe(2);
@@ -379,9 +372,7 @@ describe('Excel Helpers', () => {
       });
 
       it('should throw if sheet already exists', () => {
-        expect(() => addSheet(workbook, 'Sheet1')).toThrow(
-          'Sheet "Sheet1" already exists'
-        );
+        expect(() => addSheet(workbook, 'Sheet1')).toThrow('Sheet "Sheet1" already exists');
       });
     });
 
@@ -395,15 +386,11 @@ describe('Excel Helpers', () => {
       });
 
       it('should throw if sheet not found', () => {
-        expect(() => deleteSheet(workbook, 'NonExistent')).toThrow(
-          'Sheet "NonExistent" not found'
-        );
+        expect(() => deleteSheet(workbook, 'NonExistent')).toThrow('Sheet "NonExistent" not found');
       });
 
       it('should throw if trying to delete only sheet', () => {
-        expect(() => deleteSheet(workbook, 'Sheet1')).toThrow(
-          'Cannot delete the only sheet'
-        );
+        expect(() => deleteSheet(workbook, 'Sheet1')).toThrow('Cannot delete the only sheet');
       });
     });
 

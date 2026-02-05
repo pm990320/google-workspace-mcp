@@ -25,7 +25,11 @@ import { registerExcelTools } from './tools/excel.tools.js';
 import { initializeAccounts, getAccountClients, getAccountEmail } from './accounts.js';
 
 // Import server wrapper for read-only mode and security
-import { createServerWithConfig, getServerConfigFromEnv, setServerConfig } from './serverWrapper.js';
+import {
+  createServerWithConfig,
+  getServerConfigFromEnv,
+  setServerConfig,
+} from './serverWrapper.js';
 
 // --- Initialization ---
 let accountsInitialized = false;
@@ -149,7 +153,9 @@ async function startServer() {
         console.error('   Read-only: Write operations are disabled.');
       }
       if (serverConfig.noThirdParty) {
-        console.error('   No-third-party: External communications (email sending, sharing, invites) are blocked.');
+        console.error(
+          '   No-third-party: External communications (email sending, sharing, invites) are blocked.'
+        );
       }
     } else {
       console.error('Starting Google Workspace MCP server...');

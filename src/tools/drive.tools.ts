@@ -1224,7 +1224,8 @@ export function registerDriveTools(options: DriveToolOptions) {
         }
 
         const fileName = args.fileName || basename(pathValidation.resolvedPath);
-        const detectedMimeType = mime.lookup(pathValidation.resolvedPath) || 'application/octet-stream';
+        const detectedMimeType =
+          mime.lookup(pathValidation.resolvedPath) || 'application/octet-stream';
         const uploadMimeType = args.mimeType || detectedMimeType;
 
         // Determine if we should convert to Google format

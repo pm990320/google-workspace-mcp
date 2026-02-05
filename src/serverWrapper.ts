@@ -59,10 +59,7 @@ function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extend
   const wrappedExecute = async (args: unknown, context: Context<T>): Promise<unknown> => {
     // Check for third-party actions at runtime if noThirdParty mode is enabled
     if (config.noThirdParty) {
-      const thirdPartyCheck = checkThirdPartyAction(
-        tool.name,
-        args as Record<string, unknown>
-      );
+      const thirdPartyCheck = checkThirdPartyAction(tool.name, args as Record<string, unknown>);
       if (thirdPartyCheck.blocked) {
         throw new Error(
           `${thirdPartyCheck.reason}\n\nRestart the server without --no-third-party to enable external communications.${HELP_MESSAGE}`
@@ -152,23 +149,20 @@ export function getServerConfigFromEnv(): ServerConfig {
 
   // Allow overriding allowed paths via environment variables (comma-separated)
   if (process.env.GOOGLE_MCP_ALLOWED_WRITE_PATHS) {
-    config.pathSecurity.allowedWritePaths = process.env.GOOGLE_MCP_ALLOWED_WRITE_PATHS
-      .split(',')
+    config.pathSecurity.allowedWritePaths = process.env.GOOGLE_MCP_ALLOWED_WRITE_PATHS.split(',')
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
   }
 
   if (process.env.GOOGLE_MCP_ALLOWED_READ_PATHS) {
-    config.pathSecurity.allowedReadPaths = process.env.GOOGLE_MCP_ALLOWED_READ_PATHS
-      .split(',')
+    config.pathSecurity.allowedReadPaths = process.env.GOOGLE_MCP_ALLOWED_READ_PATHS.split(',')
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
   }
 
   // Allow adding additional forbidden patterns via environment variable (comma-separated)
   if (process.env.GOOGLE_MCP_FORBIDDEN_PATHS) {
-    const additionalPatterns = process.env.GOOGLE_MCP_FORBIDDEN_PATHS
-      .split(',')
+    const additionalPatterns = process.env.GOOGLE_MCP_FORBIDDEN_PATHS.split(',')
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
     config.pathSecurity.forbiddenPathPatterns = [
