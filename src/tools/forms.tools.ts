@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { type FormsToolOptions, type FormsQuestion } from '../types.js';
 import { getFormsUrl } from '../urlHelpers.js';
+import { escapeDriveQuery } from '../securityHelpers.js';
 
 export function registerFormsTools(options: FormsToolOptions) {
   const { server, getFormsClient, getDriveClient, getAccountEmail } = options;
@@ -40,7 +41,8 @@ export function registerFormsTools(options: FormsToolOptions) {
 
       let queryString = "mimeType='application/vnd.google-apps.form' and trashed=false";
       if (args.query) {
-        queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+        const safeQuery = escapeDriveQuery(args.query);
+        queryString += ` and (name contains '${safeQuery}' or fullText contains '${safeQuery}')`;
       }
 
       // Don't use orderBy when query contains fullText search (Google Drive API limitation)

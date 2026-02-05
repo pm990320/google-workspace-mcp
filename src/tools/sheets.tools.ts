@@ -6,6 +6,8 @@ import * as SheetsHelpers from '../googleSheetsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { type SheetsToolOptions } from '../types.js';
 import { getSheetsUrl } from '../urlHelpers.js';
+import { escapeDriveQuery, validateWritePath } from '../securityHelpers.js';
+import { getServerConfig } from '../serverWrapper.js';
 
 export function registerSheetsTools(options: SheetsToolOptions) {
   const { server, getSheetsClient, getDriveClient, getAccountEmail } = options;
@@ -553,9 +555,15 @@ export function registerSheetsTools(options: SheetsToolOptions) {
       const { Readable } = await import('stream');
       const pathModule = await import('path');
 
+      // Validate output path for security
+      const pathValidation = validateWritePath(args.outputPath, getServerConfig().pathSecurity);
+      if (!pathValidation.valid) {
+        throw new UserError(`Invalid output path: ${pathValidation.error}`);
+      }
+
       const sheets = await getSheetsClient(args.account);
       log.info(
-        `Downloading spreadsheet ${args.spreadsheetId} as ${args.format.toUpperCase()} to ${args.outputPath}`
+        `Downloading spreadsheet ${args.spreadsheetId} as ${args.format.toUpperCase()} to ${pathValidation.resolvedPath}`
       );
 
       try {
@@ -700,7 +708,8 @@ export function registerSheetsTools(options: SheetsToolOptions) {
       try {
         let queryString = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false";
         if (args.query) {
-          queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+          const safeQuery = escapeDriveQuery(args.query);
+          queryString += ` and (name contains '${safeQuery}' or fullText contains '${safeQuery}')`;
         }
 
         // Don't use orderBy when query contains fullText search (Google Drive API limitation)

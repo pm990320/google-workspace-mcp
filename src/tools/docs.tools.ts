@@ -28,6 +28,8 @@ import {
 import * as GDocsHelpers from '../googleDocsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { getDocsUrl } from '../urlHelpers.js';
+import { validateReadPath } from '../securityHelpers.js';
+import { getServerConfig } from '../serverWrapper.js';
 
 /**
  * Converts Google Docs JSON structure to Markdown format
@@ -1330,8 +1332,15 @@ export function registerDocsTools(options: DocsToolOptions) {
     execute: async (args, { log }) => {
       const docs = await getDocsClient(args.account);
       const drive = await getDriveClient(args.account);
+
+      // Validate path for security
+      const pathValidation = validateReadPath(args.localImagePath, getServerConfig().pathSecurity);
+      if (!pathValidation.valid) {
+        throw new UserError(`Cannot read from this path: ${pathValidation.error}`);
+      }
+
       log.info(
-        `Uploading local image ${args.localImagePath} and inserting at index ${args.index} in doc ${args.documentId}`
+        `Uploading local image ${pathValidation.resolvedPath} and inserting at index ${args.index} in doc ${args.documentId}`
       );
 
       try {
@@ -1358,7 +1367,7 @@ export function registerDocsTools(options: DocsToolOptions) {
         log.info('Uploading image to Drive...');
         const imageUrl = await GDocsHelpers.uploadImageToDrive(
           drive,
-          args.localImagePath,
+          pathValidation.resolvedPath,
           parentFolderId
         );
         log.info(`Image uploaded successfully, public URL: ${imageUrl}`);

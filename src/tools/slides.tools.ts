@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { type SlidesToolOptions, type PageElement, type SlidesRequest } from '../types.js';
 import { getSlidesUrl } from '../urlHelpers.js';
+import { escapeDriveQuery } from '../securityHelpers.js';
 
 export function registerSlidesTools(options: SlidesToolOptions) {
   const { server, getSlidesClient, getDriveClient, getAccountEmail } = options;
@@ -40,7 +41,8 @@ export function registerSlidesTools(options: SlidesToolOptions) {
 
       let queryString = "mimeType='application/vnd.google-apps.presentation' and trashed=false";
       if (args.query) {
-        queryString += ` and (name contains '${args.query}' or fullText contains '${args.query}')`;
+        const safeQuery = escapeDriveQuery(args.query);
+        queryString += ` and (name contains '${safeQuery}' or fullText contains '${safeQuery}')`;
       }
 
       // Don't use orderBy when query contains fullText search (Google Drive API limitation)
