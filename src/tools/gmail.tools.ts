@@ -4,10 +4,13 @@ import * as path from 'path';
 import { z } from 'zod';
 import { formatToolError } from '../errorHelpers.js';
 import { type GmailToolOptions, type MessagePart } from '../types.js';
-import { getGmailMessageUrl, getGmailDraftsUrl } from '../urlHelpers.js';
+import { getGmailMessageUrl, getGmailDraftsUrl, getDriveFileUrl } from '../urlHelpers.js';
+import { Readable } from 'stream';
+import { validateWritePath } from '../securityHelpers.js';
+import { getServerConfig } from '../serverWrapper.js';
 
 export function registerGmailTools(options: GmailToolOptions) {
-  const { server, getGmailClient, getAccountEmail } = options;
+  const { server, getGmailClient, getDriveClient, getAccountEmail } = options;
   server.addTool({
     name: 'listGmailMessages',
     description:
@@ -1613,16 +1616,22 @@ export function registerGmailTools(options: GmailToolOptions) {
             throw new Error(`savePath must be an absolute path. Received: ${args.savePath}`);
           }
 
+          // Validate path for security
+          const pathValidation = validateWritePath(args.savePath, getServerConfig().pathSecurity);
+          if (!pathValidation.valid) {
+            throw new Error(`Cannot save to this path: ${pathValidation.error}`);
+          }
+
           // Decode and save to file
           const buffer = Buffer.from(base64Data, 'base64');
 
           // Ensure parent directory exists
-          const parentDir = path.dirname(args.savePath);
+          const parentDir = path.dirname(pathValidation.resolvedPath);
           await fs.mkdir(parentDir, { recursive: true });
 
-          await fs.writeFile(args.savePath, buffer);
+          await fs.writeFile(pathValidation.resolvedPath, buffer);
 
-          result += `**Saved to:** ${args.savePath}\n`;
+          result += `**Saved to:** ${pathValidation.resolvedPath}\n`;
           result += `File size on disk: ${buffer.length} bytes`;
         } else {
           // Return full base64 data
@@ -1632,6 +1641,143 @@ export function registerGmailTools(options: GmailToolOptions) {
         return result;
       } catch (error: unknown) {
         throw new Error(formatToolError('downloadGmailAttachment', error));
+      }
+    },
+  });
+
+  // --- Save Gmail Attachment to Drive ---
+  server.addTool({
+    name: 'saveAttachmentToDrive',
+    description:
+      'Save a Gmail attachment directly to Google Drive. Uploads the attachment as a file to Drive without downloading locally first.',
+    annotations: {
+      title: 'Save Attachment to Drive',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    parameters: z.object({
+      account: z.string().describe('Account name to use'),
+      messageId: z.string().describe('The ID of the message containing the attachment'),
+      attachmentId: z
+        .string()
+        .describe('The attachment ID (from readGmailMessage attachment info)'),
+      fileName: z
+        .string()
+        .optional()
+        .describe(
+          'Optional custom file name for the saved file. If not provided, uses the original attachment name.'
+        ),
+      folderId: z
+        .string()
+        .optional()
+        .describe(
+          'Optional Google Drive folder ID to save the file to. If not provided, saves to root of My Drive.'
+        ),
+    }),
+    async execute(args, { log: _log }) {
+      try {
+        const gmail = await getGmailClient(args.account);
+        const drive = await getDriveClient(args.account);
+        const accountEmail = await getAccountEmail(args.account);
+
+        // First, get attachment metadata from the message to find the filename
+        const messageResponse = await gmail.users.messages.get({
+          userId: 'me',
+          id: args.messageId,
+          format: 'full',
+        });
+
+        // Find attachment info in message parts
+        let attachmentFilename = 'attachment';
+        let attachmentMimeType = 'application/octet-stream';
+
+        const findAttachmentInfo = (part: MessagePart) => {
+          if (part.body?.attachmentId === args.attachmentId && part.filename) {
+            attachmentFilename = part.filename;
+            attachmentMimeType = part.mimeType || 'application/octet-stream';
+            return true;
+          }
+          if (part.parts) {
+            for (const subpart of part.parts) {
+              if (findAttachmentInfo(subpart)) return true;
+            }
+          }
+          return false;
+        };
+
+        if (messageResponse.data.payload) {
+          findAttachmentInfo(messageResponse.data.payload);
+        }
+
+        // Use custom filename if provided
+        const finalFileName = args.fileName || attachmentFilename;
+
+        // Get the attachment data
+        const attachmentResponse = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId: args.messageId,
+          id: args.attachmentId,
+        });
+
+        const attachment = attachmentResponse.data;
+        const size = attachment.size || 0;
+
+        if (!attachment.data) {
+          throw new Error('No attachment data available');
+        }
+
+        // Convert base64url to standard base64, then to buffer
+        const base64Data = attachment.data.replace(/-/g, '+').replace(/_/g, '/');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Create a readable stream from the buffer for Drive upload
+        const bufferStream = new Readable();
+        bufferStream.push(buffer);
+        bufferStream.push(null);
+
+        // Upload to Google Drive
+        const fileMetadata: { name: string; parents?: string[] } = {
+          name: finalFileName,
+        };
+
+        if (args.folderId) {
+          fileMetadata.parents = [args.folderId];
+        }
+
+        const driveResponse = await drive.files.create({
+          requestBody: fileMetadata,
+          media: {
+            mimeType: attachmentMimeType,
+            body: bufferStream,
+          },
+          fields: 'id,name,webViewLink,mimeType,size',
+        });
+
+        const driveFile = driveResponse.data;
+        const fileId = driveFile.id;
+
+        if (!fileId) {
+          throw new Error('Failed to upload file to Drive - no file ID returned');
+        }
+
+        const driveLink = getDriveFileUrl(fileId, accountEmail);
+
+        let result = '**Attachment Saved to Drive**\n\n';
+        result += `File Name: ${driveFile.name}\n`;
+        result += `File ID: ${fileId}\n`;
+        result += `MIME Type: ${driveFile.mimeType || attachmentMimeType}\n`;
+        result += `Size: ${size} bytes (${(size / 1024).toFixed(2)} KB)\n`;
+        if (args.folderId) {
+          result += `Folder ID: ${args.folderId}\n`;
+        }
+        result += `\nView in Drive: ${driveLink}\n`;
+        result += `\nSource Message ID: ${args.messageId}`;
+
+        return result;
+      } catch (error: unknown) {
+        throw new Error(formatToolError('saveAttachmentToDrive', error));
       }
     },
   });
