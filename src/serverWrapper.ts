@@ -1,11 +1,20 @@
-// src/serverWrapper.ts - Server wrapper for read-only mode enforcement and error handling
+// src/serverWrapper.ts - Server wrapper for read-only mode enforcement, third-party blocking, and error handling
 import type { Tool, ToolParameters, Context } from 'fastmcp';
 import { type FastMCP } from 'fastmcp';
 import type { FastMCPSessionAuth } from './types.js';
+import {
+  type PathSecurityConfig,
+  DEFAULT_PATH_SECURITY_CONFIG,
+  checkThirdPartyAction,
+} from './securityHelpers.js';
 
 export interface ServerConfig {
   /** When true, tools with readOnlyHint: false will be blocked at runtime */
   readOnly: boolean;
+  /** When true, tools that communicate with third parties are blocked */
+  noThirdParty: boolean;
+  /** Path security configuration for file system operations */
+  pathSecurity: PathSecurityConfig;
 }
 
 const HELP_MESSAGE = `
@@ -42,11 +51,25 @@ interface ToolWithAnnotations<
  * Wraps a tool's execute function with error handling that adds help links
  */
 function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extends ToolParameters>(
-  tool: ToolWithAnnotations<T, Params>
+  tool: ToolWithAnnotations<T, Params>,
+  config: ServerConfig
 ): ToolWithAnnotations<T, Params> {
   const originalExecute = tool.execute;
 
   const wrappedExecute = async (args: unknown, context: Context<T>): Promise<unknown> => {
+    // Check for third-party actions at runtime if noThirdParty mode is enabled
+    if (config.noThirdParty) {
+      const thirdPartyCheck = checkThirdPartyAction(
+        tool.name,
+        args as Record<string, unknown>
+      );
+      if (thirdPartyCheck.blocked) {
+        throw new Error(
+          `${thirdPartyCheck.reason}\n\nRestart the server without --no-third-party to enable external communications.${HELP_MESSAGE}`
+        );
+      }
+    }
+
     try {
       return await (originalExecute as (args: unknown, context: Context<T>) => Promise<unknown>)(
         args,
@@ -67,6 +90,7 @@ function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extend
  * Wraps a FastMCP server to:
  * 1. Add global error handling with help links to all tools
  * 2. Enforce read-only mode based on tool annotations (if enabled)
+ * 3. Block third-party communications (if enabled)
  *
  * @param server - The FastMCP server instance
  * @param config - Server configuration
@@ -79,7 +103,7 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
   // Store original addTool method
   const originalAddTool = server.addTool.bind(server);
 
-  // Override addTool to wrap all tools with error handling (and read-only enforcement if configured)
+  // Override addTool to wrap all tools with error handling (and mode enforcement if configured)
   server.addTool = function <Params extends ToolParameters>(
     tool: ToolWithAnnotations<T, Params>
   ): void {
@@ -107,8 +131,8 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
       return;
     }
 
-    // Wrap tool with error handler
-    const wrappedTool = wrapExecuteWithErrorHandler(tool);
+    // Wrap tool with error handler and third-party checking
+    const wrappedTool = wrapExecuteWithErrorHandler(tool, config);
     originalAddTool(wrappedTool);
   };
 
@@ -116,10 +140,58 @@ export function createServerWithConfig<T extends FastMCPSessionAuth>(
 }
 
 /**
- * Parse server config from environment variables
+ * Parse server config from environment variables and optional config file
  */
 export function getServerConfigFromEnv(): ServerConfig {
-  return {
+  // Start with defaults
+  const config: ServerConfig = {
     readOnly: process.env.GOOGLE_MCP_READ_ONLY === 'true',
+    noThirdParty: process.env.GOOGLE_MCP_NO_THIRD_PARTY === 'true',
+    pathSecurity: { ...DEFAULT_PATH_SECURITY_CONFIG },
   };
+
+  // Allow overriding allowed paths via environment variables (comma-separated)
+  if (process.env.GOOGLE_MCP_ALLOWED_WRITE_PATHS) {
+    config.pathSecurity.allowedWritePaths = process.env.GOOGLE_MCP_ALLOWED_WRITE_PATHS
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+  }
+
+  if (process.env.GOOGLE_MCP_ALLOWED_READ_PATHS) {
+    config.pathSecurity.allowedReadPaths = process.env.GOOGLE_MCP_ALLOWED_READ_PATHS
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+  }
+
+  // Allow adding additional forbidden patterns via environment variable (comma-separated)
+  if (process.env.GOOGLE_MCP_FORBIDDEN_PATHS) {
+    const additionalPatterns = process.env.GOOGLE_MCP_FORBIDDEN_PATHS
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    config.pathSecurity.forbiddenPathPatterns = [
+      ...config.pathSecurity.forbiddenPathPatterns,
+      ...additionalPatterns,
+    ];
+  }
+
+  return config;
+}
+
+/**
+ * Get the current server configuration (for use in tool modules)
+ */
+let currentConfig: ServerConfig | null = null;
+
+export function setServerConfig(config: ServerConfig): void {
+  currentConfig = config;
+}
+
+export function getServerConfig(): ServerConfig {
+  if (!currentConfig) {
+    currentConfig = getServerConfigFromEnv();
+  }
+  return currentConfig;
 }
