@@ -19,12 +19,13 @@ import { registerGmailTools } from './tools/gmail.tools.js';
 import { registerCalendarTools } from './tools/calendar.tools.js';
 import { registerSlidesTools } from './tools/slides.tools.js';
 import { registerFormsTools } from './tools/forms.tools.js';
+import { registerExcelTools } from './tools/excel.tools.js';
 
 // Import multi-account management
 import { initializeAccounts, getAccountClients, getAccountEmail } from './accounts.js';
 
-// Import server wrapper for read-only mode
-import { createServerWithConfig, getServerConfigFromEnv } from './serverWrapper.js';
+// Import server wrapper for read-only mode and security
+import { createServerWithConfig, getServerConfigFromEnv, setServerConfig } from './serverWrapper.js';
 
 // --- Initialization ---
 let accountsInitialized = false;
@@ -47,6 +48,8 @@ process.on('unhandledRejection', (reason, _promise) => {
 
 // --- Server Configuration ---
 const serverConfig = getServerConfigFromEnv();
+// Make config available globally for tool modules
+setServerConfig(serverConfig);
 
 const baseServer = new FastMCP({
   name: 'Google Workspace MCP Server',
@@ -116,7 +119,7 @@ registerDriveTools({ server, getDriveClient, getDocsClient, getAccountEmail });
 registerSheetsTools({ server, getSheetsClient, getDriveClient, getAccountEmail });
 
 // Register Gmail tools
-registerGmailTools({ server, getGmailClient, getAccountEmail });
+registerGmailTools({ server, getGmailClient, getDriveClient, getAccountEmail });
 
 // Register Calendar tools
 registerCalendarTools({ server, getCalendarClient, getAccountEmail });
@@ -127,16 +130,27 @@ registerSlidesTools({ server, getSlidesClient, getDriveClient, getAccountEmail }
 // Register Forms tools (also needs Drive client for listing)
 registerFormsTools({ server, getFormsClient, getDriveClient, getAccountEmail });
 
+// Register Excel tools (uses Drive client for file operations)
+registerExcelTools({ server, getDriveClient, getAccountEmail });
+
 // --- Server Startup ---
 async function startServer() {
   try {
     await ensureAccountsInitialized();
 
-    if (serverConfig.readOnly) {
-      console.error('⚠️  Starting Google Workspace MCP server in READ-ONLY mode...');
-      console.error(
-        '   Write operations are disabled. Use --read-only=false or remove the flag to enable writes.'
-      );
+    // Log security mode status
+    const modes: string[] = [];
+    if (serverConfig.readOnly) modes.push('READ-ONLY');
+    if (serverConfig.noThirdParty) modes.push('NO-THIRD-PARTY');
+
+    if (modes.length > 0) {
+      console.error(`⚠️  Starting Google Workspace MCP server in ${modes.join(' + ')} mode...`);
+      if (serverConfig.readOnly) {
+        console.error('   Read-only: Write operations are disabled.');
+      }
+      if (serverConfig.noThirdParty) {
+        console.error('   No-third-party: External communications (email sending, sharing, invites) are blocked.');
+      }
     } else {
       console.error('Starting Google Workspace MCP server...');
     }
