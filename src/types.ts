@@ -356,6 +356,7 @@ export interface SheetsToolOptions extends BaseToolOptions {
 /** Options for registering Gmail tools */
 export interface GmailToolOptions extends BaseToolOptions {
   getGmailClient: (accountName: string) => Promise<GmailClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
 }
 
 /** Options for registering Calendar tools */
@@ -372,5 +373,10 @@ export interface SlidesToolOptions extends BaseToolOptions {
 /** Options for registering Forms tools */
 export interface FormsToolOptions extends BaseToolOptions {
   getFormsClient: (accountName: string) => Promise<FormsClient>;
+  getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
+
+/** Options for registering Excel tools */
+export interface ExcelToolOptions extends BaseToolOptions {
   getDriveClient: (accountName: string) => Promise<DriveClient>;
 }
