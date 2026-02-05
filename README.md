@@ -10,7 +10,7 @@ Connect Claude Desktop (or other MCP clients) to your entire Google Workspace: D
 > 👥 **NEW:** Multi-account support (connect multiple Google accounts)
 > 🔧 **NEW:** CLI for easy setup and account management
 
-This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **83+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
+This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp` library to provide **95+ tools** for reading, writing, formatting, and managing your entire Google Workspace. It acts as a powerful bridge, allowing AI assistants like Claude to interact with your documents, emails, calendars, and files programmatically.
 
 **Upgrading from [a-bonus/google-docs-mcp](https://github.com/a-bonus/google-docs-mcp)?** See [UPGRADE.md](UPGRADE.md) for migration instructions.
 
@@ -57,6 +57,18 @@ This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp
 - **Add Sheets:** Add new sheets/tabs to spreadsheets with `addSpreadsheetSheet`
 - **List Spreadsheets:** Find and list spreadsheets with `listGoogleSheets`
 
+### 🆕 Excel Format Support (Sheets)
+
+Edit Excel-format files (.xlsx/.xls) directly on Google Drive without converting to native Sheets:
+
+- **List Excel Files:** Find Excel-format files with `listExcelFiles`
+- **Read Data:** Read ranges with `readExcelFile` (A1 notation supported)
+- **Write Data:** Write to cells (`writeExcelCell`) or ranges (`writeExcelRange`)
+- **Append Rows:** Add data with `appendExcelRows`
+- **Sheet Management:** `listExcelSheets`, `addExcelSheet`, `deleteExcelSheet`, `renameExcelSheet`
+- **File Info:** Get metadata with `getExcelInfo`
+- **Convert to Sheets:** Use `convertExcelToSheets` when you need full Sheets API support
+
 ### 🆕 Google Drive File Management
 
 - **Document Discovery:** Find and list documents with `listGoogleDocs`, `searchGoogleDocs`, `getRecentGoogleDocs`
@@ -73,7 +85,9 @@ This comprehensive server uses the Model Context Protocol (MCP) and the `fastmcp
 - **Mark Read/Unread:** Quick status changes with `markAsRead` and `markAsUnread`
 - **Threads:** View conversations with `listGmailThreads` and `readGmailThread`
 - **Attachments:**
-  - Download: `getGmailAttachment` (get attachment data by ID)
+  - Preview: `getGmailAttachment` (get truncated attachment data for preview)
+  - Download: `downloadGmailAttachment` (save full attachment to local file)
+  - Save to Drive: `saveAttachmentToDrive` (upload attachment directly to Google Drive)
   - Add to draft: `addAttachmentToDraft` (attach files to existing drafts)
   - Remove from draft: `removeAttachmentFromDraft`
 - **Labels:** List labels with `listGmailLabels`, add with `addGmailLabel`, remove with `removeGmailLabel`

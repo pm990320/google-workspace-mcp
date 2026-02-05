@@ -184,6 +184,97 @@ Steps:
 3. Report the list of exported files with their sizes
 ```
 
+## Excel Format Tasks (Sheets)
+
+## 18. Edit Excel Files Without Converting
+
+```
+Task: "Update a vendor's Excel price list that was uploaded to Drive, keeping it in Excel format."
+
+Steps:
+1. Use listExcelFiles to find Excel files matching 'price list'
+2. Use readExcelFile to read the current data from range A1:D100
+3. Use writeExcelRange to update specific price cells
+4. File remains in .xlsx format for the vendor to download
+```
+
+## 19. Process Uploaded Excel Reports
+
+```
+Task: "Extract data from multiple Excel reports uploaded by team members."
+
+Steps:
+1. Use listExcelFiles with folderId to find Excel files in the 'Reports' folder
+2. For each file, use getExcelInfo to see sheet names and dimensions
+3. Use readExcelFile to extract data from the 'Summary' sheet of each
+4. Compile the extracted data into a new native Google Sheet using createSpreadsheet
+```
+
+## 20. Migrate Excel Files to Google Sheets
+
+```
+Task: "Convert legacy Excel files to Google Sheets for better collaboration."
+
+Steps:
+1. Use listExcelFiles to find all Excel files in a folder
+2. For each file, use convertExcelToSheets to create a native Sheets copy
+3. The original Excel files are preserved as backups
+4. Team can now use real-time collaboration features
+```
+
+## 21. Maintain Excel Compatibility for External Partners
+
+```
+Task: "Update a shared Excel workbook that external partners need to download in Excel format."
+
+Steps:
+1. Use listExcelSheets to see the workbook structure
+2. Use readExcelFile to review current data
+3. Use appendExcelRows to add new data rows
+4. Use addExcelSheet to create a new 'Q2 Summary' tab
+5. File stays in .xlsx format so partners can open in Microsoft Excel
+```
+
+## Gmail Attachment Tasks
+
+## 22. Save Email Attachments to Drive
+
+```
+Task: "Save an important attachment from an email directly to a specific Drive folder."
+
+Steps:
+1. Use searchGmail to find the email with the attachment (e.g., "from:vendor@company.com has:attachment invoice")
+2. Use readGmailMessage to get the message details and attachment IDs
+3. Use saveAttachmentToDrive to upload the attachment directly to a specific folder
+4. Attachment is now accessible in Drive for sharing and collaboration
+```
+
+## 23. Download and Process Email Attachments
+
+```
+Task: "Download an Excel attachment from an email, update it, and save back to Drive."
+
+Steps:
+1. Use searchGmail to find emails with Excel attachments ("has:attachment filename:xlsx")
+2. Use readGmailMessage to get the attachment ID and metadata
+3. Use downloadGmailAttachment with savePath to download locally
+4. Use readExcelFile (after uploading to Drive) or process locally
+5. Use uploadFileToDrive to save the processed file to Drive
+```
+
+## 24. Archive Email Attachments to Organized Folders
+
+```
+Task: "Automatically save attachments from clients to their respective folders."
+
+Steps:
+1. Use listGmailMessages with a query like "from:client@company.com has:attachment"
+2. For each message, use readGmailMessage to get attachment info
+3. Use searchGoogleDocs or list folder contents to find the client's folder
+4. Use saveAttachmentToDrive with the folderId to save to the right location
+5. Use addGmailLabel to mark the email as processed
+```
+
 ## Google Drive Management Tasks
 
 ## 11. Organize Project Files Automatically
