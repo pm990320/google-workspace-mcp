@@ -6,7 +6,7 @@ import { formatToolError } from '../errorHelpers.js';
 import { type GmailToolOptions, type MessagePart } from '../types.js';
 import { getGmailMessageUrl, getGmailDraftsUrl, getDriveFileUrl } from '../urlHelpers.js';
 import { Readable } from 'stream';
-import { validateWritePath } from '../securityHelpers.js';
+import { validateWritePath, wrapEmailContent } from '../securityHelpers.js';
 import { getServerConfig } from '../serverWrapper.js';
 
 export function registerGmailTools(options: GmailToolOptions) {
@@ -185,7 +185,13 @@ export function registerGmailTools(options: GmailToolOptions) {
           result += `**Snippet:** ${message.snippet}\n\n`;
         }
 
-        result += `**Body**\n${body || '(empty)'}\n\n`;
+        // Wrap email body with security warnings to defend against prompt injection
+        const from = getHeader('From');
+        const subject = getHeader('Subject');
+        const wrappedBody = body
+          ? wrapEmailContent(body, from || undefined, subject || undefined)
+          : '(empty)';
+        result += `**Body**\n${wrappedBody}\n\n`;
 
         if (attachments.length > 0) {
           result += `**Attachments (${attachments.length})**\n`;
@@ -2022,7 +2028,13 @@ export function registerGmailTools(options: GmailToolOptions) {
 
           if (args.format === 'full' && message.payload) {
             const body = extractBody(message.payload);
-            result += `**Body:**\n${body || '(empty)'}\n`;
+            // Wrap email body with security warnings to defend against prompt injection
+            const from = getHeader(headers, 'From');
+            const subject = getHeader(headers, 'Subject');
+            const wrappedBody = body
+              ? wrapEmailContent(body, from || undefined, subject || undefined)
+              : '(empty)';
+            result += `**Body:**\n${wrappedBody}\n`;
           } else if (message.snippet) {
             result += `**Snippet:** ${message.snippet}\n`;
           }
