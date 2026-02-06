@@ -6,7 +6,7 @@ import * as SheetsHelpers from '../googleSheetsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { type SheetsToolOptions } from '../types.js';
 import { getSheetsUrl } from '../urlHelpers.js';
-import { escapeDriveQuery, validateWritePath } from '../securityHelpers.js';
+import { escapeDriveQuery, validateWritePath, wrapSpreadsheetContent } from '../securityHelpers.js';
 import { getServerConfig } from '../serverWrapper.js';
 
 export function registerSheetsTools(options: SheetsToolOptions) {
@@ -49,10 +49,16 @@ export function registerSheetsTools(options: SheetsToolOptions) {
 
         const email = await getAccountEmail(args.account);
         const link = getSheetsUrl(args.spreadsheetId, email);
-        let result = `**Spreadsheet Range:** ${args.range}\n\n`;
+
+        // Build cell content and wrap with security warning
+        let cellContent = '';
         values.forEach((row, index) => {
-          result += `Row ${index + 1}: ${JSON.stringify(row)}\n`;
+          cellContent += `Row ${index + 1}: ${JSON.stringify(row)}\n`;
         });
+        const wrappedContent = wrapSpreadsheetContent(cellContent, undefined, args.range);
+
+        let result = `**Spreadsheet Range:** ${args.range}\n\n`;
+        result += wrappedContent;
         result += `\nView spreadsheet: ${link}`;
 
         return result;

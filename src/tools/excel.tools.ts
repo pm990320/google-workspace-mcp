@@ -6,7 +6,7 @@ import { type ExcelToolOptions } from '../types.js';
 import { getErrorMessage } from '../errorHelpers.js';
 import { getDriveFileUrl } from '../urlHelpers.js';
 import * as ExcelHelpers from '../excelHelpers.js';
-import { escapeDriveQuery } from '../securityHelpers.js';
+import { escapeDriveQuery, wrapSpreadsheetContent } from '../securityHelpers.js';
 
 export function registerExcelTools(options: ExcelToolOptions) {
   const { server, getDriveClient, getAccountEmail } = options;
@@ -105,14 +105,17 @@ export function registerExcelTools(options: ExcelToolOptions) {
           return `Range ${args.range} in sheet "${sheetName}" is empty.`;
         }
 
+        // Build cell content and wrap with security warning
+        let cellContent = '';
+        values.forEach((row, index) => {
+          cellContent += `Row ${index + 1}: ${JSON.stringify(row)}\n`;
+        });
+        const wrappedContent = wrapSpreadsheetContent(cellContent, sheetName, args.range);
+
         let result = `**File:** ${fileName}\n`;
         result += `**Sheet:** ${sheetName}\n`;
         result += `**Range:** ${args.range}\n\n`;
-
-        values.forEach((row, index) => {
-          result += `Row ${index + 1}: ${JSON.stringify(row)}\n`;
-        });
-
+        result += wrappedContent;
         result += `\nView in Drive: ${link}`;
         return result;
       } catch (error: unknown) {

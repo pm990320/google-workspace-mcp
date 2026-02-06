@@ -28,7 +28,7 @@ import {
 import * as GDocsHelpers from '../googleDocsApiHelpers.js';
 import { isGoogleApiError, getErrorMessage } from '../errorHelpers.js';
 import { getDocsUrl } from '../urlHelpers.js';
-import { validateReadPath } from '../securityHelpers.js';
+import { validateReadPath, wrapCommentContent, wrapDocumentContent } from '../securityHelpers.js';
 import { getServerConfig } from '../serverWrapper.js';
 
 /**
@@ -268,10 +268,15 @@ export function registerDocsTools(options: DocsToolOptions) {
           // Apply length limit to markdown if specified
           if (args.maxLength && totalLength > args.maxLength) {
             const truncatedContent = markdownContent.substring(0, args.maxLength);
-            return `${truncatedContent}\n\n... [Markdown truncated to ${args.maxLength} chars of ${totalLength} total. Use maxLength parameter to adjust limit or remove it to get full content.]`;
+            const wrappedContent = wrapDocumentContent(
+              truncatedContent,
+              res.data.title || undefined
+            );
+            return `${wrappedContent}\n\n... [Markdown truncated to ${args.maxLength} chars of ${totalLength} total. Use maxLength parameter to adjust limit or remove it to get full content.]`;
           }
 
-          return markdownContent;
+          // Wrap markdown content with security warning
+          return wrapDocumentContent(markdownContent, res.data.title || undefined);
         }
 
         // Default: Text format - extract all text content
@@ -313,16 +318,21 @@ export function registerDocsTools(options: DocsToolOptions) {
         log.info(`Document contains ${totalLength} characters across ${elementCount} elements`);
         log.info(`maxLength parameter: ${args.maxLength || 'not specified'}`);
 
+        // Wrap document content to defend against prompt injection
+        const docTitle = res.data.title || undefined;
+
         // Apply length limit only if specified
         if (args.maxLength && totalLength > args.maxLength) {
           const truncatedContent = textContent.substring(0, args.maxLength);
           log.info(`Truncating content from ${totalLength} to ${args.maxLength} characters`);
-          return `Content (truncated to ${args.maxLength} chars of ${totalLength} total):\n---\n${truncatedContent}\n\n... [Document continues for ${totalLength - args.maxLength} more characters. Use maxLength parameter to adjust limit or remove it to get full content.]`;
+          const wrappedContent = wrapDocumentContent(truncatedContent, docTitle);
+          return `Content (truncated to ${args.maxLength} chars of ${totalLength} total):\n${wrappedContent}\n\n... [Document continues for ${totalLength - args.maxLength} more characters. Use maxLength parameter to adjust limit or remove it to get full content.]`;
         }
 
-        // Return full content
+        // Return full content wrapped with security warning
         const docLink = getDocsUrl(args.documentId, email);
-        const fullResponse = `Content (${totalLength} characters):\n---\n${textContent}\n\n---\nView document: ${docLink}`;
+        const wrappedContent = wrapDocumentContent(textContent, docTitle);
+        const fullResponse = `Content (${totalLength} characters):\n${wrappedContent}\n\n---\nView document: ${docLink}`;
         const responseLength = fullResponse.length;
         log.info(
           `Returning full content: ${responseLength} characters in response (${totalLength} content + ${responseLength - totalLength} metadata)`
@@ -1489,7 +1499,10 @@ export function registerDocsTools(options: DocsToolOptions) {
                 ? ` (anchored to: "${quotedText.substring(0, 100)}${quotedText.length > 100 ? '...' : ''}")`
                 : '';
 
-            let result = `\n${index + 1}. **${author}** (${date})${status}${anchor}\n   ${comment.content}`;
+            // Wrap comment content to defend against prompt injection
+            const wrappedContent = wrapCommentContent(comment.content || '', author);
+
+            let result = `\n${index + 1}. **${author}** (${date})${status}${anchor}\n${wrappedContent}`;
 
             if (replies > 0) {
               result += `\n   └─ ${replies} ${replies === 1 ? 'reply' : 'replies'}`;
@@ -1543,7 +1556,9 @@ export function registerDocsTools(options: DocsToolOptions) {
         const quotedText = comment.quotedFileContent?.value || 'No quoted text';
         const anchor = quotedText !== 'No quoted text' ? `\nAnchored to: "${quotedText}"` : '';
 
-        let result = `**${author}** (${date})${status}${anchor}\n${comment.content}`;
+        // Wrap comment content to defend against prompt injection
+        const wrappedContent = wrapCommentContent(comment.content || '', author);
+        let result = `**${author}** (${date})${status}${anchor}\n${wrappedContent}`;
 
         // Add replies if any
         if (comment.replies && comment.replies.length > 0) {
@@ -1553,7 +1568,9 @@ export function registerDocsTools(options: DocsToolOptions) {
             const replyDate = reply.createdTime
               ? new Date(reply.createdTime).toLocaleDateString()
               : 'Unknown date';
-            result += `\n${index + 1}. **${replyAuthor}** (${replyDate})\n   ${reply.content}`;
+            // Wrap reply content to defend against prompt injection
+            const wrappedReply = wrapCommentContent(reply.content || '', replyAuthor);
+            result += `\n${index + 1}. **${replyAuthor}** (${replyDate})\n${wrappedReply}`;
           });
         }
 

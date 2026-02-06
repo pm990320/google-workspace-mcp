@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { type FormsToolOptions, type FormsQuestion } from '../types.js';
 import { getFormsUrl } from '../urlHelpers.js';
-import { escapeDriveQuery } from '../securityHelpers.js';
+import { escapeDriveQuery, wrapFormResponse } from '../securityHelpers.js';
 
 export function registerFormsTools(options: FormsToolOptions) {
   const { server, getFormsClient, getDriveClient, getAccountEmail } = options;
@@ -201,20 +201,24 @@ export function registerFormsTools(options: FormsToolOptions) {
         if (r.respondentEmail) result += `   Respondent: ${r.respondentEmail}\n`;
 
         if (r.answers) {
-          result += '   Answers:\n';
+          // Build answers content separately to wrap with security warning
+          let answersContent = '';
           Object.entries(r.answers).forEach(([questionId, answer]) => {
-            result += `     - Question ${questionId}: `;
+            answersContent += `- Question ${questionId}: `;
             if (answer.textAnswers?.answers) {
-              result += answer.textAnswers.answers.map((a) => a.value).join(', ');
+              answersContent += answer.textAnswers.answers.map((a) => a.value).join(', ');
             } else if (answer.fileUploadAnswers?.answers) {
-              result += answer.fileUploadAnswers.answers
+              answersContent += answer.fileUploadAnswers.answers
                 .map((a) => `${a.fileName} (${a.fileId})`)
                 .join(', ');
             } else {
-              result += '(no answer)';
+              answersContent += '(no answer)';
             }
-            result += '\n';
+            answersContent += '\n';
           });
+          // Wrap form response content to defend against prompt injection
+          result += '   Answers:\n';
+          result += wrapFormResponse(answersContent, undefined, r.respondentEmail || undefined);
         }
         result += '\n';
       });
