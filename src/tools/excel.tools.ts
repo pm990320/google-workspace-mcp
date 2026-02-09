@@ -87,6 +87,12 @@ export function registerExcelTools(options: ExcelToolOptions) {
         .describe(
           'Name of the sheet to read from. If not provided, reads from the first sheet. Use listExcelSheets to see available sheets.'
         ),
+      maxRows: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum number of rows to return (default: unlimited). Use this to prevent accidentally reading enormous ranges.'
+        ),
     }),
     execute: async (args, { log }) => {
       const drive = await getDriveClient(args.account);
@@ -98,11 +104,19 @@ export function registerExcelTools(options: ExcelToolOptions) {
         const sheet = ExcelHelpers.getWorksheet(workbook, args.sheetName);
         const sheetName = args.sheetName || workbook.SheetNames[0];
 
-        const values = ExcelHelpers.readRange(sheet, args.range);
+        let values = ExcelHelpers.readRange(sheet, args.range);
+        const totalRows = values.length;
         const link = getDriveFileUrl(args.fileId, email);
 
         if (values.length === 0 || (values.length === 1 && values[0].length === 0)) {
           return `Range ${args.range} in sheet "${sheetName}" is empty.`;
+        }
+
+        // Apply maxRows limit
+        let truncatedNotice = '';
+        if (args.maxRows && values.length > args.maxRows) {
+          values = values.slice(0, args.maxRows);
+          truncatedNotice = `\n\n⚠️ Showing ${args.maxRows} of ${totalRows} rows. Increase maxRows to see more.`;
         }
 
         // Build cell content and wrap with security warning
@@ -114,9 +128,11 @@ export function registerExcelTools(options: ExcelToolOptions) {
 
         let result = `**File:** ${fileName}\n`;
         result += `**Sheet:** ${sheetName}\n`;
-        result += `**Range:** ${args.range}\n\n`;
+        result += `**Range:** ${args.range}\n`;
+        result += `**Rows:** ${values.length}${totalRows !== values.length ? ` of ${totalRows}` : ''}\n\n`;
         result += wrappedContent;
         result += `\nView in Drive: ${link}`;
+        result += truncatedNotice;
         return result;
       } catch (error: unknown) {
         const message = getErrorMessage(error);

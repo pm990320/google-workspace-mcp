@@ -23,6 +23,27 @@ For help, see: https://github.com/zueai/google-workspace-mcp#troubleshooting
 To report an issue: https://github.com/zueai/google-workspace-mcp/issues`;
 
 /**
+ * Maximum characters allowed in a tool response before truncation.
+ * Configurable via GOOGLE_MCP_MAX_RESPONSE_CHARS env var.
+ */
+const MAX_RESPONSE_CHARS = parseInt(process.env.GOOGLE_MCP_MAX_RESPONSE_CHARS || '100000', 10);
+
+/**
+ * Truncate a tool response string if it exceeds the configured limit.
+ */
+function guardResponseSize(response: string, toolName: string): string {
+  if (response.length > MAX_RESPONSE_CHARS) {
+    const truncated = response.substring(0, MAX_RESPONSE_CHARS);
+    return (
+      truncated +
+      `\n\n[...RESPONSE TRUNCATED — tool "${toolName}" returned ${response.length.toLocaleString()} chars, ` +
+      `limit is ${MAX_RESPONSE_CHARS.toLocaleString()}. Use more specific parameters to reduce response size.]`
+    );
+  }
+  return response;
+}
+
+/**
  * Enhances error messages with help links
  */
 function enhanceErrorMessage(error: unknown): string {
@@ -68,10 +89,16 @@ function wrapExecuteWithErrorHandler<T extends FastMCPSessionAuth, Params extend
     }
 
     try {
-      return await (originalExecute as (args: unknown, context: Context<T>) => Promise<unknown>)(
-        args,
-        context
-      );
+      const result = await (
+        originalExecute as (args: unknown, context: Context<T>) => Promise<unknown>
+      )(args, context);
+
+      // Apply global response size guard to string results
+      if (typeof result === 'string') {
+        return guardResponseSize(result, tool.name);
+      }
+
+      return result;
     } catch (error) {
       throw new Error(enhanceErrorMessage(error));
     }

@@ -34,6 +34,12 @@ export function registerSheetsTools(options: SheetsToolOptions) {
         .optional()
         .default('FORMATTED_VALUE')
         .describe('How values should be rendered in the output.'),
+      maxRows: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum number of rows to return (default: unlimited). Use this to prevent accidentally reading enormous ranges.'
+        ),
     }),
     execute: async (args, { log }) => {
       const sheets = await getSheetsClient(args.account);
@@ -41,10 +47,18 @@ export function registerSheetsTools(options: SheetsToolOptions) {
 
       try {
         const response = await SheetsHelpers.readRange(sheets, args.spreadsheetId, args.range);
-        const values = response.values ?? [];
+        let values = response.values ?? [];
+        const totalRows = values.length;
 
         if (values.length === 0) {
           return `Range ${args.range} is empty or does not exist.`;
+        }
+
+        // Apply maxRows limit
+        let truncatedNotice = '';
+        if (args.maxRows && values.length > args.maxRows) {
+          values = values.slice(0, args.maxRows);
+          truncatedNotice = `\n\n⚠️ Showing ${args.maxRows} of ${totalRows} rows. Increase maxRows to see more.`;
         }
 
         const email = await getAccountEmail(args.account);
@@ -57,9 +71,11 @@ export function registerSheetsTools(options: SheetsToolOptions) {
         });
         const wrappedContent = wrapSpreadsheetContent(cellContent, undefined, args.range);
 
-        let result = `**Spreadsheet Range:** ${args.range}\n\n`;
+        let result = `**Spreadsheet Range:** ${args.range}\n`;
+        result += `**Rows:** ${values.length}${totalRows !== values.length ? ` of ${totalRows}` : ''}\n\n`;
         result += wrappedContent;
         result += `\nView spreadsheet: ${link}`;
+        result += truncatedNotice;
 
         return result;
       } catch (error: unknown) {

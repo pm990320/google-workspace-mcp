@@ -1,5 +1,6 @@
 // gmail.tools.ts - Gmail tool module
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { z } from 'zod';
 import { formatToolError } from '../errorHelpers.js';
@@ -95,6 +96,12 @@ export function registerGmailTools(options: GmailToolOptions) {
         .optional()
         .default('full')
         .describe('Response format'),
+      maxLength: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum character length of the response. If the result exceeds this, it will be truncated with a notice.'
+        ),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -205,6 +212,12 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         if (link) {
           result += `View in Gmail: ${link}`;
+        }
+
+        // Apply maxLength truncation if specified
+        if (args.maxLength && result.length > args.maxLength) {
+          result = result.substring(0, args.maxLength);
+          result += `\n\n[...TRUNCATED at ${args.maxLength} chars. Full message has more content. Use a larger maxLength or omit it to see everything.]`;
         }
 
         return result;
@@ -1640,8 +1653,24 @@ export function registerGmailTools(options: GmailToolOptions) {
           result += `**Saved to:** ${pathValidation.resolvedPath}\n`;
           result += `File size on disk: ${buffer.length} bytes`;
         } else {
-          // Return full base64 data
-          result += `**Base64 Data (standard encoding):**\n${base64Data}`;
+          // Auto-save large attachments to temp file to avoid blowing up LLM context
+          const MAX_INLINE_BYTES = 1024; // 1KB threshold
+          const buffer = Buffer.from(base64Data, 'base64');
+
+          if (buffer.length > MAX_INLINE_BYTES) {
+            const tempDir = os.tmpdir();
+            const safeName = attachmentFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const tempPath = path.join(tempDir, `gmail-attachment-${Date.now()}-${safeName}`);
+            await fs.writeFile(tempPath, buffer);
+
+            result += `**Saved to:** ${tempPath}\n`;
+            result += `File size on disk: ${buffer.length} bytes\n\n`;
+            result += `⚠️ File was auto-saved to a temp path because it exceeds the ${MAX_INLINE_BYTES}-byte inline limit.\n`;
+            result += `Use the savePath parameter to save to a specific location.`;
+          } else {
+            // Small enough to return inline
+            result += `**Base64 Data (standard encoding):**\n${base64Data}`;
+          }
         }
 
         return result;
@@ -1964,6 +1993,12 @@ export function registerGmailTools(options: GmailToolOptions) {
         .optional()
         .default('full')
         .describe('Response format for messages in the thread'),
+      maxLength: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum character length of the response. If the result exceeds this, it will be truncated with a notice.'
+        ),
     }),
     async execute(args, { log: _log }) {
       try {
@@ -2047,6 +2082,12 @@ export function registerGmailTools(options: GmailToolOptions) {
         const link = thread.id ? getGmailMessageUrl(thread.id, accountEmail) : undefined;
         if (link) {
           result += `\n\nView thread in Gmail: ${link}`;
+        }
+
+        // Apply maxLength truncation if specified
+        if (args.maxLength && result.length > args.maxLength) {
+          result = result.substring(0, args.maxLength);
+          result += `\n\n[...TRUNCATED at ${args.maxLength} chars. Thread has ${messages.length} messages. Use a larger maxLength or omit it to see everything.]`;
         }
 
         return result;
