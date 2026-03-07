@@ -1666,7 +1666,7 @@ export function registerGmailTools(options: GmailToolOptions) {
             result += `**Saved to:** ${tempPath}\n`;
             result += `File size on disk: ${buffer.length} bytes\n\n`;
             result += `⚠️ File was auto-saved to a temp path because it exceeds the ${MAX_INLINE_BYTES}-byte inline limit.\n`;
-            result += `Use the savePath parameter to save to a specific location.`;
+            result += 'Use the savePath parameter to save to a specific location.';
           } else {
             // Small enough to return inline
             result += `**Base64 Data (standard encoding):**\n${base64Data}`;

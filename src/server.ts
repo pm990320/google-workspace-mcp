@@ -8,6 +8,7 @@ import {
   type calendar_v3,
   type slides_v1,
   type forms_v1,
+  type people_v1,
 } from 'googleapis';
 
 // Import tool modules
@@ -20,6 +21,7 @@ import { registerCalendarTools } from './tools/calendar.tools.js';
 import { registerSlidesTools } from './tools/slides.tools.js';
 import { registerFormsTools } from './tools/forms.tools.js';
 import { registerExcelTools } from './tools/excel.tools.js';
+import { registerPeopleTools } from './tools/people.tools.js';
 
 // Import multi-account management
 import { initializeAccounts, getAccountClients, getAccountEmail } from './accounts.js';
@@ -106,6 +108,12 @@ async function getFormsClient(accountName: string): Promise<forms_v1.Forms> {
   return clients.forms;
 }
 
+async function getPeopleClient(accountName: string): Promise<people_v1.People> {
+  await ensureAccountsInitialized();
+  const clients = await getAccountClients(accountName);
+  return clients.people;
+}
+
 // ===========================================
 // === REGISTER ALL TOOL MODULES ===
 // ===========================================
@@ -136,6 +144,9 @@ registerFormsTools({ server, getFormsClient, getDriveClient, getAccountEmail });
 
 // Register Excel tools (uses Drive client for file operations)
 registerExcelTools({ server, getDriveClient, getAccountEmail });
+
+// Register People tools (Google Contacts/People API)
+registerPeopleTools({ server, getPeopleClient, getAccountEmail });
 
 // --- Server Startup ---
 async function startServer() {

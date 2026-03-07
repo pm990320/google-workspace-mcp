@@ -14,6 +14,8 @@ import {
   getCalendarEventUrl,
   getCalendarUrl,
   addAuthUserToUrl,
+  getContactsUrl,
+  getContactPersonUrl,
 } from '../dist/urlHelpers.js';
 import { describe, it, expect } from 'vitest';
 
@@ -279,6 +281,41 @@ describe('URL Helpers', () => {
     it('should encode special characters in email', () => {
       const url = addAuthUserToUrl('https://example.com/path', testEmailWithSpecialChars);
       expect(url).toBe('https://example.com/path?authuser=test%2Balias%40example.com');
+    });
+  });
+
+  describe('getContactsUrl', () => {
+    it('should construct a valid Google Contacts URL', () => {
+      const url = getContactsUrl(testEmail);
+      expect(url).toBe('https://contacts.google.com/?authuser=test%40example.com');
+    });
+
+    it('should encode special characters in email', () => {
+      const url = getContactsUrl(testEmailWithSpecialChars);
+      expect(url).toBe('https://contacts.google.com/?authuser=test%2Balias%40example.com');
+    });
+  });
+
+  describe('getContactPersonUrl', () => {
+    it('should construct a valid contact person URL from resource name', () => {
+      const url = getContactPersonUrl('people/c1234567890', testEmail);
+      expect(url).toBe(
+        'https://contacts.google.com/person/c1234567890?authuser=test%40example.com'
+      );
+    });
+
+    it('should handle resource names without people/ prefix', () => {
+      const url = getContactPersonUrl('c1234567890', testEmail);
+      expect(url).toBe(
+        'https://contacts.google.com/person/c1234567890?authuser=test%40example.com'
+      );
+    });
+
+    it('should encode special characters in email', () => {
+      const url = getContactPersonUrl('people/c1234567890', testEmailWithSpecialChars);
+      expect(url).toBe(
+        'https://contacts.google.com/person/c1234567890?authuser=test%2Balias%40example.com'
+      );
     });
   });
 });

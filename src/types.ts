@@ -8,6 +8,7 @@ import {
   type forms_v1,
   type sheets_v4,
   type calendar_v3,
+  type people_v1,
 } from 'googleapis';
 import { type FastMCP } from 'fastmcp';
 
@@ -26,6 +27,7 @@ export type GmailClient = gmail_v1.Gmail;
 export type CalendarClient = calendar_v3.Calendar;
 export type SlidesClient = slides_v1.Slides;
 export type FormsClient = forms_v1.Forms;
+export type PeopleClient = people_v1.People;
 
 // --- Google Docs API Types ---
 export type StructuralElement = docs_v1.Schema$StructuralElement;
@@ -379,4 +381,9 @@ export interface FormsToolOptions extends BaseToolOptions {
 /** Options for registering Excel tools */
 export interface ExcelToolOptions extends BaseToolOptions {
   getDriveClient: (accountName: string) => Promise<DriveClient>;
+}
+
+/** Options for registering People tools */
+export interface PeopleToolOptions extends BaseToolOptions {
+  getPeopleClient: (accountName: string) => Promise<PeopleClient>;
 }

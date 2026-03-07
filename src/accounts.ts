@@ -10,6 +10,7 @@ import {
   type calendar_v3,
   type slides_v1,
   type forms_v1,
+  type people_v1,
 } from 'googleapis';
 import { type OAuth2Client, type Credentials } from 'google-auth-library';
 import * as fs from 'fs/promises';
@@ -34,6 +35,9 @@ const SCOPES = [
   'https://www.googleapis.com/auth/presentations',
   'https://www.googleapis.com/auth/forms.body',
   'https://www.googleapis.com/auth/forms.responses.readonly',
+  'https://www.googleapis.com/auth/contacts', // Full access to contacts (read/write)
+  'https://www.googleapis.com/auth/contacts.other.readonly', // Read "other contacts" (auto-saved)
+  'https://www.googleapis.com/auth/directory.readonly', // Read organization directory (Workspace only)
 ];
 
 // --- Types ---
@@ -59,6 +63,7 @@ export interface AccountClients {
   calendar: calendar_v3.Calendar;
   slides: slides_v1.Slides;
   forms: forms_v1.Forms;
+  people: people_v1.People;
 }
 
 // --- No in-memory caching - always read fresh from disk ---
@@ -284,6 +289,7 @@ export async function getAccountClients(accountName: string): Promise<AccountCli
     calendar: google.calendar({ version: 'v3', auth: authClient }),
     slides: google.slides({ version: 'v1', auth: authClient }),
     forms: google.forms({ version: 'v1', auth: authClient }),
+    people: google.people({ version: 'v1', auth: authClient }),
   };
 }
 
