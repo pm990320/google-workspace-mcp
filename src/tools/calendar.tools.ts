@@ -11,7 +11,8 @@ function formatDateTime(
   if (!dt) return 'N/A';
   if (dt.dateTime) {
     const d = new Date(dt.dateTime);
-    return d.toLocaleString() + (dt.timeZone ? ` (${dt.timeZone})` : '');
+    const tz = dt.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return d.toLocaleString('en-US', { timeZone: tz }) + ' (' + tz + ')';
   }
   if (dt.date) return dt.date + ' (all day)';
   return 'N/A';
