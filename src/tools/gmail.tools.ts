@@ -44,7 +44,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.list({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           maxResults: Math.min(args.maxResults || 10, 500),
           labelIds: args.labelIds,
           q: args.query,
@@ -108,7 +108,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           format: args.format,
         });
@@ -254,7 +254,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const listResponse = await gmail.users.messages.list({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           q: args.query,
           maxResults: Math.min(args.maxResults || 20, 100),
         });
@@ -278,7 +278,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         for (let i = 0; i < messagesWithIds.length; i++) {
           const m = messagesWithIds[i];
           const msg = await gmail.users.messages.get({
-            userId: 'me',
+            userId: await getAccountEmail(args.account),
             id: m.id,
             format: 'metadata',
             metadataHeaders: ['From', 'Subject', 'Date'],
@@ -324,7 +324,7 @@ export function registerGmailTools(options: GmailToolOptions) {
       try {
         const gmail = await getGmailClient(args.account);
 
-        const response = await gmail.users.labels.list({ userId: 'me' });
+        const response = await gmail.users.labels.list({ userId: await getAccountEmail(args.account) });
         const labels = response.data.labels ?? [];
 
         let result = `**Gmail Labels (${labels.length} total)**\n\n`;
@@ -413,7 +413,7 @@ export function registerGmailTools(options: GmailToolOptions) {
             : undefined;
 
         const response = await gmail.users.labels.create({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             name: args.name,
             labelListVisibility: args.labelListVisibility,
@@ -470,7 +470,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           requestBody: {
             addLabelIds: [args.labelId],
@@ -521,7 +521,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           requestBody: {
             removeLabelIds: [args.labelId],
@@ -598,7 +598,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         // If replying to a message, get thread info and headers for proper threading
         if (args.replyToMessageId) {
           const originalMessage = await gmail.users.messages.get({
-            userId: 'me',
+            userId: await getAccountEmail(args.account),
             id: args.replyToMessageId,
             format: 'metadata',
             metadataHeaders: ['Message-ID', 'References'],
@@ -680,7 +680,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           .replace(/=+$/, '');
 
         const response = await gmail.users.drafts.create({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             message: {
               raw: encodedEmail,
@@ -736,7 +736,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.list({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           maxResults: Math.min(args.maxResults || 20, 100),
         });
 
@@ -756,7 +756,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
           // Get draft details
           const draftDetails = await gmail.users.drafts.get({
-            userId: 'me',
+            userId: await getAccountEmail(args.account),
             id: draft.id,
             format: 'metadata',
           });
@@ -802,7 +802,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           format: 'full',
         });
@@ -911,7 +911,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get the current draft content
         const currentDraft = await gmail.users.drafts.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           format: 'full',
         });
@@ -1013,7 +1013,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1076,7 +1076,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get current draft
         const currentDraft = await gmail.users.drafts.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           format: 'full',
         });
@@ -1107,7 +1107,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           } else if (part.filename && part.body?.attachmentId) {
             // Fetch attachment data
             const attachmentResponse = await gmail.users.messages.attachments.get({
-              userId: 'me',
+              userId: await getAccountEmail(args.account),
               messageId: currentMessage?.id || '',
               id: part.body.attachmentId,
             });
@@ -1184,7 +1184,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1233,7 +1233,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get current draft
         const currentDraft = await gmail.users.drafts.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           format: 'full',
         });
@@ -1264,7 +1264,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           } else if (part.filename && part.body?.attachmentId) {
             // Fetch attachment data
             const attachmentResponse = await gmail.users.messages.attachments.get({
-              userId: 'me',
+              userId: await getAccountEmail(args.account),
               messageId: currentMessage?.id || '',
               id: part.body.attachmentId,
             });
@@ -1358,7 +1358,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1407,7 +1407,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.trash({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
         });
 
@@ -1438,7 +1438,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.send({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             id: args.draftId,
           },
@@ -1484,7 +1484,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.drafts.delete({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.draftId,
         });
 
@@ -1517,7 +1517,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.attachments.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1578,7 +1578,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get attachment metadata from the message to find the filename
         const messageResponse = await gmail.users.messages.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           format: 'full',
         });
@@ -1607,7 +1607,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get the attachment data
         const response = await gmail.users.messages.attachments.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1719,7 +1719,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get attachment metadata from the message to find the filename
         const messageResponse = await gmail.users.messages.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           format: 'full',
         });
@@ -1751,7 +1751,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get the attachment data
         const attachmentResponse = await gmail.users.messages.attachments.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1837,7 +1837,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           requestBody: {
             removeLabelIds: ['UNREAD'],
@@ -1882,7 +1882,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.messageId,
           requestBody: {
             addLabelIds: ['UNREAD'],
@@ -1940,7 +1940,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.threads.list({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           maxResults: Math.min(args.maxResults || 10, 500),
           labelIds: args.labelIds,
           q: args.query,
@@ -2005,7 +2005,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.threads.get({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.threadId,
           format: args.format,
         });
@@ -2126,7 +2126,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.batchModify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             ids: args.messageIds,
             addLabelIds: args.labelIds,
@@ -2178,7 +2178,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.batchModify({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             ids: args.messageIds,
             removeLabelIds: args.labelIds,
@@ -2217,7 +2217,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.settings.filters.list({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
         });
 
         const filters = response.data.filter ?? [];
@@ -2317,7 +2317,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.settings.filters.create({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           requestBody: {
             criteria: {
               from: args.from,
@@ -2377,7 +2377,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.settings.filters.delete({
-          userId: 'me',
+          userId: await getAccountEmail(args.account),
           id: args.filterId,
         });
 
