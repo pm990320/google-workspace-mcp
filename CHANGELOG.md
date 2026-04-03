@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/pm990320/google-workspace-mcp/compare/v2.3.6...v2.4.0) (2026-04-03)
+
+
+### Features
+
+* add Google People API (Contacts) support ([#1](https://github.com/pm990320/google-workspace-mcp/issues/1)) ([d27b5c2](https://github.com/pm990320/google-workspace-mcp/commit/d27b5c25d8d98c36c141ea898f4868a6a919a437))
+
 ## [2.3.6](https://github.com/pm990320/google-workspace-mcp/compare/v2.3.5...v2.3.6) (2026-04-03)
 
 
