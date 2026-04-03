@@ -2,20 +2,67 @@ name: Release Please
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
-  issues: write
+  id-token: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: [release-please]
+    runs-on: ubuntu-latest
+    if: needs.release-please.outputs.releases_created == 'true' || needs.release-please.outputs.release_created == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches version
+        run: |
+          if [ "${{ steps.version.outputs.tag }}" != "${{ needs.release-please.outputs.tag_name }}" ]; then
+            echo "Error: release tag ${{ needs.release-please.outputs.tag_name }} does not match package.json version ${{ steps.version.outputs.tag }}"
+            exit 1
+          fi
+          echo "Publishing version ${{ steps.version.outputs.version }}"
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
