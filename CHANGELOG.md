@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.6](https://github.com/pm990320/google-workspace-mcp/compare/v2.3.5...v2.3.6) (2026-04-03)
+
+
+### Bug Fixes
+
+* use tag_name for checkout to fix npm publish ([c2af661](https://github.com/pm990320/google-workspace-mcp/commit/c2af6614267b144049eafbda2218b9d5a7ad12a8))
+* use tag_name output for checkout instead of github.ref ([c39e1f7](https://github.com/pm990320/google-workspace-mcp/commit/c39e1f7b621b02147887843be0825ded6d99dabe))
+
 ## [2.3.5](https://github.com/pm990320/google-workspace-mcp/compare/v2.3.4...v2.3.5) (2026-04-03)
 
 
