@@ -1,6 +1,6 @@
 # Google Workspace MCP Server
 
-FastMCP server with 100+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, Forms, and Excel files.
+FastMCP server with 100+ tools for Google Workspace: Docs, Sheets, Drive, Gmail, Calendar, Slides, Forms, People (Contacts), and Excel files.
 
 ## Multi-Account Support
 
@@ -43,6 +43,7 @@ All tools require an `account` parameter. Use `listAccounts` to see available ac
 | Calendar | 6 | `listCalendars`, `listCalendarEvents`, `getCalendarEvent`, `createCalendarEvent`, `updateCalendarEvent`, `deleteCalendarEvent` |
 | Slides | 5 | `listPresentations`, `readPresentation`, `createPresentation`, `addSlide`, `addTextToSlide` |
 | Forms | 5 | `listForms`, `readForm`, `getFormResponses`, `createForm`, `addFormQuestion` |
+| People | 18 | `listPeopleContacts`, `searchPeopleContacts`, `getPeopleContact`, `batchGetPeopleContacts`, `createPeopleContact`, `updatePeopleContact`, `updatePeopleContactPhoto`, `deletePeopleContactPhoto`, `listPeopleContactGroups`, `getPeopleContactGroup`, `createPeopleContactGroup`, `updatePeopleContactGroup`, `deletePeopleContactGroup`, `modifyPeopleContactGroupMembers`, `listPeopleOtherContacts`, `searchPeopleOtherContacts`, `listPeopleDirectory`, `searchPeopleDirectory` |
 | Excel | 12 | `listExcelFiles`, `listExcelSheets`, `getExcelInfo`, `readExcelFile`, `writeExcelCell`, `writeExcelRange`, `appendExcelRows`, `clearExcelRange`, `addExcelSheet`, `deleteExcelSheet`, `renameExcelSheet`, `convertExcelToSheets` |
 
 *Experimental (may not work reliably)
@@ -79,6 +80,9 @@ The server requires these Google OAuth scopes:
 - `https://www.googleapis.com/auth/presentations`
 - `https://www.googleapis.com/auth/forms.body`
 - `https://www.googleapis.com/auth/forms.responses.readonly`
+- `https://www.googleapis.com/auth/contacts` (full access to contacts)
+- `https://www.googleapis.com/auth/contacts.other.readonly` (read "other contacts")
+- `https://www.googleapis.com/auth/directory.readonly` (organization directory, Workspace only)
 
 ## Safety Features
 
@@ -134,6 +138,8 @@ All tools return URLs with the `?authuser=<email>` parameter to ensure the brows
 - Drive folders: `https://drive.google.com/drive/folders/{id}?authuser=email@example.com`
 - Gmail messages: `https://mail.google.com/mail/u/?authuser=email@example.com#inbox/{id}`
 - Calendar: `https://calendar.google.com/calendar/u/0/r?authuser=email@example.com`
+- Contacts: `https://contacts.google.com/?authuser=email@example.com`
+- Contact person: `https://contacts.google.com/person/{personId}?authuser=email@example.com`
 
 **Verification:** After any operation, click the returned URL to verify the changes in your browser. The authuser parameter ensures you're viewing with the correct account.
 
@@ -313,6 +319,7 @@ GOOGLE_MCP_FORBIDDEN_PATHS="**/my-secrets/**,**/private/**"
 | `src/tools/slides.tools.ts` | Slides tool definitions |
 | `src/tools/forms.tools.ts` | Forms tool definitions |
 | `src/tools/excel.tools.ts` | Excel-format file tool definitions (Sheets with .xlsx/.xls) |
+| `src/tools/people.tools.ts` | Google People API tool definitions (Contacts) |
 | `src/excelHelpers.ts` | Excel-format parsing, cell operations, workbook manipulation |
 | `src/serverWrapper.ts` | Read-only mode, no-third-party mode enforcement wrapper |
 | `src/securityHelpers.ts` | Query sanitization, path validation, third-party detection, email content wrapping |

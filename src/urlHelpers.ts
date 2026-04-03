@@ -115,3 +115,20 @@ export function addAuthUserToUrl(url: string, accountEmail: string): string {
     return `${url}${separator}authuser=${encodeURIComponent(accountEmail)}`;
   }
 }
+
+/**
+ * Constructs a Google Contacts URL with authuser parameter
+ */
+export function getContactsUrl(accountEmail: string): string {
+  return `https://contacts.google.com/?authuser=${encodeURIComponent(accountEmail)}`;
+}
+
+/**
+ * Constructs a Google Contacts person URL with authuser parameter
+ * @param resourceName - The contact resource name (e.g., "people/c1234567890")
+ */
+export function getContactPersonUrl(resourceName: string, accountEmail: string): string {
+  // Extract the person ID from the resource name (e.g., "people/c1234567890" -> "c1234567890")
+  const personId = resourceName.replace('people/', '');
+  return `https://contacts.google.com/person/${personId}?authuser=${encodeURIComponent(accountEmail)}`;
+}
