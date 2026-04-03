@@ -23,7 +23,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       maxResults: z
         .number()
         .optional()
@@ -45,7 +50,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.list({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           maxResults: Math.min(args.maxResults || 10, 500),
           labelIds: args.labelIds,
           q: args.query,
@@ -91,7 +96,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The ID of the message to read'),
       format: z
         .enum(['full', 'metadata', 'minimal', 'raw'])
@@ -110,7 +120,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           format: args.format,
         });
@@ -240,7 +250,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       query: z
         .string()
         .describe(
@@ -257,7 +272,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const listResponse = await gmail.users.messages.list({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           q: args.query,
           maxResults: Math.min(args.maxResults || 20, 100),
         });
@@ -281,7 +296,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         for (let i = 0; i < messagesWithIds.length; i++) {
           const m = messagesWithIds[i];
           const msg = await gmail.users.messages.get({
-            userId: args.delegateFor || await getAccountEmail(args.account),
+            userId: args.delegateFor || (await getAccountEmail(args.account)),
             id: m.id,
             format: 'metadata',
             metadataHeaders: ['From', 'Subject', 'Date'],
@@ -322,13 +337,20 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
     }),
     async execute(args, { log: _log }) {
       try {
         const gmail = await getGmailClient(args.account);
 
-        const response = await gmail.users.labels.list({ userId: args.delegateFor || await getAccountEmail(args.account) });
+        const response = await gmail.users.labels.list({
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
+        });
         const labels = response.data.labels ?? [];
 
         let result = `**Gmail Labels (${labels.length} total)**\n\n`;
@@ -383,7 +405,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       name: z
         .string()
         .describe('Name of the label to create. Use "/" for nested labels (e.g., "Work/Projects")'),
@@ -418,7 +445,7 @@ export function registerGmailTools(options: GmailToolOptions) {
             : undefined;
 
         const response = await gmail.users.labels.create({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             name: args.name,
             labelListVisibility: args.labelListVisibility,
@@ -465,7 +492,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The message ID to modify'),
       labelId: z
         .string()
@@ -476,7 +508,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           requestBody: {
             addLabelIds: [args.labelId],
@@ -515,7 +547,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The message ID to modify'),
       labelId: z
         .string()
@@ -528,7 +565,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           requestBody: {
             removeLabelIds: [args.labelId],
@@ -567,7 +604,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       to: z.string().describe('Recipient email address(es)'),
       subject: z.string().describe('Email subject'),
       body: z.string().describe('Email body content'),
@@ -606,7 +648,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         // If replying to a message, get thread info and headers for proper threading
         if (args.replyToMessageId) {
           const originalMessage = await gmail.users.messages.get({
-            userId: args.delegateFor || await getAccountEmail(args.account),
+            userId: args.delegateFor || (await getAccountEmail(args.account)),
             id: args.replyToMessageId,
             format: 'metadata',
             metadataHeaders: ['Message-ID', 'References'],
@@ -688,7 +730,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           .replace(/=+$/, '');
 
         const response = await gmail.users.drafts.create({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             message: {
               raw: encodedEmail,
@@ -733,7 +775,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       maxResults: z
         .number()
         .optional()
@@ -745,7 +792,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.list({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           maxResults: Math.min(args.maxResults || 20, 100),
         });
 
@@ -765,7 +812,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
           // Get draft details
           const draftDetails = await gmail.users.drafts.get({
-            userId: args.delegateFor || await getAccountEmail(args.account),
+            userId: args.delegateFor || (await getAccountEmail(args.account)),
             id: draft.id,
             format: 'metadata',
           });
@@ -804,7 +851,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to read'),
     }),
     async execute(args, { log: _log }) {
@@ -812,7 +864,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           format: 'full',
         });
@@ -890,7 +942,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to update'),
       to: z.string().optional().describe('New recipient(s) - if not provided, keeps current'),
       cc: z.string().optional().describe('New CC recipient(s) - if not provided, keeps current'),
@@ -922,7 +979,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get the current draft content
         const currentDraft = await gmail.users.drafts.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           format: 'full',
         });
@@ -1024,7 +1081,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1074,7 +1131,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to add the attachment to'),
       filename: z.string().describe('Name of the file (e.g., "report.pdf")'),
       mimeType: z.string().describe('MIME type of the file (e.g., "application/pdf", "image/png")'),
@@ -1088,7 +1150,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get current draft
         const currentDraft = await gmail.users.drafts.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           format: 'full',
         });
@@ -1119,7 +1181,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           } else if (part.filename && part.body?.attachmentId) {
             // Fetch attachment data
             const attachmentResponse = await gmail.users.messages.attachments.get({
-              userId: args.delegateFor || await getAccountEmail(args.account),
+              userId: args.delegateFor || (await getAccountEmail(args.account)),
               messageId: currentMessage?.id || '',
               id: part.body.attachmentId,
             });
@@ -1196,7 +1258,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1236,7 +1298,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to remove the attachment from'),
       filename: z.string().describe('Name of the file to remove (must match exactly)'),
     }),
@@ -1246,7 +1313,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get current draft
         const currentDraft = await gmail.users.drafts.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           format: 'full',
         });
@@ -1277,7 +1344,7 @@ export function registerGmailTools(options: GmailToolOptions) {
           } else if (part.filename && part.body?.attachmentId) {
             // Fetch attachment data
             const attachmentResponse = await gmail.users.messages.attachments.get({
-              userId: args.delegateFor || await getAccountEmail(args.account),
+              userId: args.delegateFor || (await getAccountEmail(args.account)),
               messageId: currentMessage?.id || '',
               id: part.body.attachmentId,
             });
@@ -1371,7 +1438,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Update the draft
         const response = await gmail.users.drafts.update({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
           requestBody: {
             message: {
@@ -1413,7 +1480,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The message ID to move to trash'),
     }),
     async execute(args, { log: _log }) {
@@ -1421,7 +1493,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.trash({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
         });
 
@@ -1445,7 +1517,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to send (from createGmailDraft response)'),
     }),
     async execute(args, { log: _log }) {
@@ -1453,7 +1530,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.drafts.send({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             id: args.draftId,
           },
@@ -1492,7 +1569,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       draftId: z.string().describe('The draft ID to delete (from createGmailDraft response)'),
     }),
     async execute(args, { log: _log }) {
@@ -1500,7 +1582,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.drafts.delete({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.draftId,
         });
 
@@ -1523,7 +1605,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The ID of the message containing the attachment'),
       attachmentId: z
         .string()
@@ -1534,7 +1621,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.attachments.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1578,7 +1665,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The ID of the message containing the attachment'),
       attachmentId: z
         .string()
@@ -1596,7 +1688,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get attachment metadata from the message to find the filename
         const messageResponse = await gmail.users.messages.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           format: 'full',
         });
@@ -1625,7 +1717,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get the attachment data
         const response = await gmail.users.messages.attachments.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1712,7 +1804,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The ID of the message containing the attachment'),
       attachmentId: z
         .string()
@@ -1738,7 +1835,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // First, get attachment metadata from the message to find the filename
         const messageResponse = await gmail.users.messages.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           format: 'full',
         });
@@ -1770,7 +1867,7 @@ export function registerGmailTools(options: GmailToolOptions) {
 
         // Get the attachment data
         const attachmentResponse = await gmail.users.messages.attachments.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           messageId: args.messageId,
           id: args.attachmentId,
         });
@@ -1849,7 +1946,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The message ID to mark as read'),
     }),
     async execute(args, { log: _log }) {
@@ -1857,7 +1959,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           requestBody: {
             removeLabelIds: ['UNREAD'],
@@ -1895,7 +1997,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageId: z.string().describe('The message ID to mark as unread'),
     }),
     async execute(args, { log: _log }) {
@@ -1903,7 +2010,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.messages.modify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.messageId,
           requestBody: {
             addLabelIds: ['UNREAD'],
@@ -1940,7 +2047,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       maxResults: z
         .number()
         .optional()
@@ -1962,7 +2074,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.threads.list({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           maxResults: Math.min(args.maxResults || 10, 500),
           labelIds: args.labelIds,
           q: args.query,
@@ -2009,7 +2121,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       threadId: z.string().describe('The ID of the thread to read'),
       format: z
         .enum(['full', 'metadata', 'minimal'])
@@ -2028,7 +2145,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.threads.get({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.threadId,
           format: args.format,
         });
@@ -2134,7 +2251,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageIds: z
         .array(z.string())
         .min(1)
@@ -2150,7 +2272,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.batchModify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             ids: args.messageIds,
             addLabelIds: args.labelIds,
@@ -2185,7 +2307,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       messageIds: z
         .array(z.string())
         .min(1)
@@ -2203,7 +2330,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.messages.batchModify({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             ids: args.messageIds,
             removeLabelIds: args.labelIds,
@@ -2236,14 +2363,19 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
     }),
     async execute(args, { log: _log }) {
       try {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.settings.filters.list({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
         });
 
         const filters = response.data.filter ?? [];
@@ -2301,7 +2433,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       // Criteria (at least one required)
       from: z.string().optional().describe('Filter emails from this sender'),
       to: z.string().optional().describe('Filter emails to this recipient'),
@@ -2344,7 +2481,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         const response = await gmail.users.settings.filters.create({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           requestBody: {
             criteria: {
               from: args.from,
@@ -2397,7 +2534,12 @@ export function registerGmailTools(options: GmailToolOptions) {
     },
     parameters: z.object({
       account: z.string().describe('Account name to use'),
-      delegateFor: z.string().optional().describe('Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account\'s own mailbox.'),
+      delegateFor: z
+        .string()
+        .optional()
+        .describe(
+          "Email address of a user who has granted delegate access to this account. When set, Gmail API calls operate on the delegated mailbox instead of the account's own mailbox."
+        ),
       filterId: z.string().describe('The ID of the filter to delete (from listGmailFilters)'),
     }),
     async execute(args, { log: _log }) {
@@ -2405,7 +2547,7 @@ export function registerGmailTools(options: GmailToolOptions) {
         const gmail = await getGmailClient(args.account);
 
         await gmail.users.settings.filters.delete({
-          userId: args.delegateFor || await getAccountEmail(args.account),
+          userId: args.delegateFor || (await getAccountEmail(args.account)),
           id: args.filterId,
         });
 
