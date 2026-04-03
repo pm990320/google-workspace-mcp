@@ -13,6 +13,9 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -24,60 +27,26 @@ jobs:
   publish:
     needs: [release-please]
     runs-on: ubuntu-latest
+    if: needs.release-please.outputs.releases_created == 'true'
     steps:
-      - name: Check for release tag
-        id: check_tag
-        run: |
-          REF="${{ github.ref }}"
-          if [[ "$REF" == refs/tags/* ]]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No release tag — skipping npm publish"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.check_tag.outputs.found == 'true'
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - uses: actions/setup-node@v4
-        if: steps.check_tag.outputs.found == 'true'
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
-        if: steps.check_tag.outputs.found == 'true'
         run: npm ci
 
       - name: Build
-        if: steps.check_tag.outputs.found == 'true'
         run: npm run build
 
       - name: Test
-        if: steps.check_tag.outputs.found == 'true'
         run: npm test
 
-      - name: Get version
-        if: steps.check_tag.outputs.found == 'true'
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Verify tag matches version
-        if: steps.check_tag.outputs.found == 'true'
-        run: |
-          if [ "${{ steps.version.outputs.tag }}" != "${{ steps.check_tag.outputs.tag }}" ]; then
-            echo "Error: release tag ${{ steps.check_tag.outputs.tag }} does not match package.json version ${{ steps.version.outputs.tag }}"
-            exit 1
-          fi
-          echo "Publishing version ${{ steps.version.outputs.version }}"
-
       - name: Publish to npm
-        if: steps.check_tag.outputs.found == 'true'
         run: npm publish --provenance --access public
